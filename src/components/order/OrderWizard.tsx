@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { productLabel, shapeLabel } from "@/lib/constants";
 import { itemCheck, perSheet, sizeText } from "@/lib/sticker-size";
-import { baht, isValidPhone, normalizePhone } from "@/lib/format";
+import { baht, isValidPhone, normalizePhone, phoneProblem } from "@/lib/format";
 import { computeQuote, defaultFreeAllocation, nudgeText, validateItems } from "@/lib/pricing";
 import type { DraftItem, PublicSettings } from "@/lib/types";
 import { Alert, CopyButton, NumberStepper, Spinner, Stepper } from "../ui";
@@ -251,7 +251,8 @@ export function OrderWizard({ settings }: { settings: PublicSettings }) {
     if (step === 2) {
       const a = customer.address;
       if (!customer.name.trim()) return setError("กรุณากรอกชื่อผู้รับ");
-      if (!isValidPhone(phone)) return setError("กรุณากรอกเบอร์โทรให้ถูกต้อง (10 หลัก)");
+      if (!isValidPhone(phone))
+        return setError(phoneProblem(customer.phone) ?? "กรุณากรอกเบอร์โทร 10 หลัก");
       if (!a.line1.trim()) return setError("กรุณากรอกบ้านเลขที่ / ถนน");
       if (!/^\d{5}$/.test(a.zipcode)) return setError("กรุณากรอกรหัสไปรษณีย์ 5 หลัก");
       if (!a.district.trim() || !a.province.trim()) return setError("กรุณากรอกอำเภอและจังหวัด");
@@ -416,7 +417,7 @@ export function OrderWizard({ settings }: { settings: PublicSettings }) {
                   <p className="text-muted">{it.product && productLabel(it.product, it.finish)}</p>
                   <p className="text-muted">
                     ไดคัท{shapeLabel(it.shape)} {sizeText(it)}
-                    {it.widthMm && it.heightMm ? ` · แผ่นละ ~${perSheet(it.widthMm, it.heightMm, settings)} ดวง` : ""}
+                    {it.widthMm && it.heightMm ? ` · แผ่นละ ~${perSheet(it.widthMm, it.heightMm, settings, it.shape)} ดวง` : ""}
                   </p>
                   <p className="text-muted">
                     {it.qty} แผ่น × {baht(quote.lines[idx]?.unitPrice ?? 0)}

@@ -1,4 +1,5 @@
 import { dpiAtSize, dpiLevel, finalize, type CheckSettings } from "./check/rules";
+import { piecesPerSheet } from "./sheet-layout";
 import type { CheckIssue, CheckResult, Settings, Shape } from "./types";
 
 export interface StickerSize {
@@ -7,17 +8,20 @@ export interface StickerSize {
   heightMm: number;
 }
 
-type LayoutSettings = Pick<Settings, "sheetWidthMm" | "sheetHeightMm" | "sheetMarginMm" | "stickerGapMm">;
+type LayoutSettings = Pick<Settings, "sheetWidthMm" | "sheetHeightMm" | "sheetMarginMm" | "stickerGapMm" | "cornerMarkMm">;
 
-/** ประมาณจำนวนดวงต่อแผ่น (จัดเรียงเป็นตาราง ลองทั้งแนวตั้งและแนวนอน) */
-export function perSheet(wMm: number, hMm: number, s: LayoutSettings) {
-  if (!(wMm > 0 && hMm > 0)) return 0;
-  const W = s.sheetWidthMm - 2 * s.sheetMarginMm;
-  const H = s.sheetHeightMm - 2 * s.sheetMarginMm;
-  const fit = (w: number, h: number) =>
-    Math.max(0, Math.floor((W + s.stickerGapMm) / (w + s.stickerGapMm))) *
-    Math.max(0, Math.floor((H + s.stickerGapMm) / (h + s.stickerGapMm)));
-  return Math.max(fit(wMm, hMm), fit(hMm, wMm));
+/**
+ * จำนวนดวงต่อแผ่น (วิธีเดียวกับ Sheet Yield Calculator ของร้าน ดู sheet-layout.ts)
+ * ไดคัทตามทรงคิดจากกรอบสี่เหลี่ยมของงาน
+ */
+export function perSheet(wMm: number, hMm: number, s: LayoutSettings, shape: Shape | null = "rect") {
+  return piecesPerSheet(wMm, hMm, shape === "circle", {
+    sheetW: s.sheetWidthMm,
+    sheetH: s.sheetHeightMm,
+    margin: s.sheetMarginMm,
+    gap: s.stickerGapMm,
+    cornerR: s.cornerMarkMm,
+  });
 }
 
 export function cm(mm: number) {
@@ -131,7 +135,7 @@ export function validateSize(
   if (!size.widthMm || !size.heightMm) return { ok: false, message: "กรุณาใส่ขนาดดวง" };
   if (Math.min(size.widthMm, size.heightMm) < s.minStickerMm)
     return { ok: false, message: `ขนาดดวงเล็กสุด ${cm(s.minStickerMm)} ซม.` };
-  if (perSheet(size.widthMm, size.heightMm, s) < 1) return { ok: false, message: "ขนาดดวงใหญ่เกินแผ่น" };
+  if (perSheet(size.widthMm, size.heightMm, s, size.shape) < 1) return { ok: false, message: "ขนาดดวงใหญ่เกินแผ่น" };
   return { ok: true };
 }
 

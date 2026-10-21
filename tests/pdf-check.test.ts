@@ -69,11 +69,11 @@ describe("ขนาดดวง", () => {
     expect(applySize(jpg, { shape: "circle", widthMm: 40, heightMm: 40 }, S)!.issues[0].code).toBe("shape");
     expect(applySize(jpg, { shape: "freeform", widthMm: 80, heightMm: 40 }, S)!.issues.map((i) => i.code)).toEqual(["shape"]);
   });
-  it("จำนวนดวงต่อแผ่น", () => {
-    // พื้นที่ใช้ได้ 310×463 ระยะห่าง 3 มม.
-    expect(perSheet(50, 50, S)).toBe(5 * 8);
-    expect(perSheet(20, 20, S)).toBe(13 * 20);
-    expect(perSheet(400, 400, S)).toBe(0);
+  it("จำนวนดวงต่อแผ่น (วิธีเดียวกับ Sheet Yield Calculator)", () => {
+    // A3+ 330×483 เว้นขอบ 3 เว้นมุม 5 ระยะห่าง 3
+    expect(perSheet(50, 50, S, "rect")).toBe(52);
+    expect(perSheet(50, 50, S, "circle")).toBe(55);
+    expect(perSheet(400, 400, S, "rect")).toBe(0);
   });
   it("PDF: รูปภายในคิดตามสัดส่วนขนาดดวง", () => {
     const pdf = { level: "green" as const, title: "", issues: [], info: { kind: "pdf", pageWidthMm: 100, pageHeightMm: 100, minImageDpi: 300 }, checkedBy: "server" as const };

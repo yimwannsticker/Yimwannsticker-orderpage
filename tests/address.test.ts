@@ -31,3 +31,15 @@ describe("parseAddress", () => {
     expect(r.line1).toBe("123 ซ.สุขุมวิท 22");
   });
 });
+
+import { isValidPhone, phoneProblem } from "@/lib/format";
+describe("เบอร์โทร", () => {
+  it("ต้องครบ 10 หลัก", () => {
+    expect(isValidPhone("0812345678")).toBe(true);
+    expect(isValidPhone("081234567")).toBe(false);
+    expect(isValidPhone("08123456789")).toBe(false);
+    expect(phoneProblem("081-234-567")).toBe("เบอร์โทรต้องมี 10 หลัก (ตอนนี้ 9 หลัก)");
+    expect(phoneProblem("081-234-5678")).toBeNull();
+    expect(phoneProblem("+66 81 234 5678")).toBeNull();
+  });
+});

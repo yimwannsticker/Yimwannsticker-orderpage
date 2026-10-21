@@ -59,7 +59,7 @@ export async function POST(req: Request) {
     zipcode: String(a.zipcode || "").trim(),
   };
   if (!name) return bad("กรุณากรอกชื่อผู้รับ");
-  if (!isValidPhone(phone)) return bad("เบอร์โทรไม่ถูกต้อง");
+  if (!isValidPhone(phone)) return bad("เบอร์โทรต้องเป็นตัวเลข 10 หลัก");
   if (!address.line1 || !address.district || !address.province || !/^\d{5}$/.test(address.zipcode))
     return bad("กรุณากรอกที่อยู่ให้ครบ");
 
@@ -97,7 +97,7 @@ export async function POST(req: Request) {
       shape,
       widthMm,
       heightMm,
-      perSheet: size ? perSheet(size.widthMm, size.heightMm, settings) : null,
+      perSheet: size ? perSheet(size.widthMm, size.heightMm, settings, size.shape) : null,
       preview: pv && pv.kind === "preview" ? pv : null,
       product,
       finish,

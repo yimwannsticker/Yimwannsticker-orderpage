@@ -5,7 +5,8 @@ export const DEFAULT_SETTINGS: Settings = {
   sheetName: "A3+",
   sheetWidthMm: 330,
   sheetHeightMm: 483,
-  sheetMarginMm: 10,
+  sheetMarginMm: 3,
+  cornerMarkMm: 5,
   stickerGapMm: 3,
   minStickerMm: 10,
   tiers: [

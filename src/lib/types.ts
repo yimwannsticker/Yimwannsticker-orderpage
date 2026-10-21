@@ -49,8 +49,10 @@ export interface Settings {
   sheetName: string;
   sheetWidthMm: number;
   sheetHeightMm: number;
-  /** ขอบแผ่นที่เว้นไว้ (มม.) ใช้ประมาณจำนวนดวงต่อแผ่น */
+  /** ขอบแผ่นถึงเส้นแดง (มม.) ใช้ประมาณจำนวนดวงต่อแผ่น */
   sheetMarginMm: number;
+  /** พื้นที่เว้นที่มุมแผ่นสำหรับเครื่องหมายตัด (มม.) */
+  cornerMarkMm: number;
   /** ระยะห่างระหว่างดวง (มม.) */
   stickerGapMm: number;
   /** ขนาดดวงเล็กสุดที่รับ (มม.) */

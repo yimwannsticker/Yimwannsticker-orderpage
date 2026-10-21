@@ -163,7 +163,8 @@ export function SettingsForm({
             <Num label="กว้าง" value={s.sheetWidthMm} onChange={(v) => set("sheetWidthMm", v)} suffix="มม." />
             <Num label="ยาว" value={s.sheetHeightMm} onChange={(v) => set("sheetHeightMm", v)} suffix="มม." />
           </div>
-          <Num label="เว้นขอบแผ่น (ใช้ประมาณจำนวนดวงต่อแผ่น)" value={s.sheetMarginMm} onChange={(v) => set("sheetMarginMm", v)} suffix="มม." />
+          <Num label="ขอบแผ่นถึงเส้นแดง (ใช้ประมาณจำนวนดวงต่อแผ่น)" value={s.sheetMarginMm} onChange={(v) => set("sheetMarginMm", v)} suffix="มม." />
+          <Num label="เว้นมุมสำหรับเครื่องหมายตัด" value={s.cornerMarkMm} onChange={(v) => set("cornerMarkMm", v)} suffix="มม." hint="ใส่ 0 ถ้าไม่ต้องเว้น" />
           <Num label="ระยะห่างระหว่างดวง" value={s.stickerGapMm} onChange={(v) => set("stickerGapMm", v)} suffix="มม." />
           <Num label="ขนาดดวงเล็กสุดที่รับ" value={s.minStickerMm} onChange={(v) => set("minStickerMm", v)} suffix="มม." />
           <Num label="ขนาดไฟล์สูงสุด" value={s.maxFileMb} onChange={(v) => set("maxFileMb", v)} suffix="MB" hint="สูงสุด 200MB" />

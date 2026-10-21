@@ -9,8 +9,19 @@ export function normalizePhone(input: string) {
   return d;
 }
 
+/** เบอร์โทรต้องเป็นตัวเลข 10 หลัก ขึ้นต้นด้วย 0 */
 export function isValidPhone(p: string) {
-  return /^0\d{8,9}$/.test(p);
+  return /^0\d{9}$/.test(p);
+}
+
+/** ข้อความเตือนเบอร์โทรที่ยังไม่ถูกต้อง (null = ถูกต้อง หรือยังไม่ได้กรอก) */
+export function phoneProblem(input: string) {
+  const d = normalizePhone(input);
+  if (!d) return null;
+  if (!d.startsWith("0")) return "เบอร์โทรต้องขึ้นต้นด้วย 0";
+  if (d.length < 10) return `เบอร์โทรต้องมี 10 หลัก (ตอนนี้ ${d.length} หลัก)`;
+  if (d.length > 10) return `เบอร์โทรต้องมี 10 หลัก (ตอนนี้เกินมา ${d.length - 10} หลัก)`;
+  return null;
 }
 
 export function formatPhone(p: string) {

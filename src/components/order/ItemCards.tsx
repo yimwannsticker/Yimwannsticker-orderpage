@@ -206,7 +206,7 @@ function SizePicker({ item, settings, onChange }: { item: DraftItem; settings: P
   const aspect = fileAspect(item.check);
   const [lock, setLock] = useState(Boolean(aspect));
   const circle = item.shape === "circle";
-  const count = item.widthMm && item.heightMm ? perSheet(item.widthMm, item.heightMm, settings) : 0;
+  const count = item.widthMm && item.heightMm ? perSheet(item.widthMm, item.heightMm, settings, item.shape) : 0;
   const [want, setWant] = useState("");
   const sharp = maxSharpText(item.check, settings);
 

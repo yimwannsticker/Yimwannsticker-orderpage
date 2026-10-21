@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { guessZip, parseAddress, type ZipEntry } from "@/lib/address-parse";
+import { phoneProblem } from "@/lib/format";
 import type { Address } from "@/lib/types";
 import { Alert } from "../ui";
 
@@ -32,6 +33,8 @@ export function AddressForm({ value, onChange }: { value: CustomerForm; onChange
   const [paste, setPaste] = useState("");
   const [zipData, setZipData] = useState<{ zip: string; entries: ZipEntry[] } | null>(null);
   const [msg, setMsg] = useState<string | null>(null);
+  const [phoneTouched, setPhoneTouched] = useState(false);
+  const phoneError = phoneProblem(value.phone);
   const a = value.address;
   const setAddr = (p: Partial<Address>) => onChange({ ...value, address: { ...a, ...p } });
   const entries = zipData?.zip === a.zipcode ? zipData.entries : [];
@@ -118,10 +121,22 @@ export function AddressForm({ value, onChange }: { value: CustomerForm; onChange
           inputMode="tel"
           autoComplete="tel"
           placeholder="0812345678"
+          maxLength={13}
+          aria-invalid={Boolean(phoneError)}
+          aria-describedby="phone-hint"
           value={value.phone}
-          onChange={(e) => onChange({ ...value, phone: e.target.value })}
+          onChange={(e) => onChange({ ...value, phone: e.target.value.replace(/[^\d\s+-]/g, "") })}
+          onBlur={() => setPhoneTouched(true)}
         />
-        <p className="mt-1 text-xs text-muted">ใช้เบอร์นี้เช็คสถานะออเดอร์และนับยอดสะสมโปร</p>
+        {phoneTouched && phoneError ? (
+          <p id="phone-hint" className="mt-1 text-sm font-medium text-bad">
+            {phoneError}
+          </p>
+        ) : (
+          <p id="phone-hint" className="mt-1 text-xs text-muted">
+            เบอร์มือถือ 10 หลัก ใช้เช็คสถานะออเดอร์และนับยอดสะสมโปร
+          </p>
+        )}
       </div>
       <div>
         <label className="label" htmlFor="line1">

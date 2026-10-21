@@ -150,7 +150,10 @@ export interface ItemValidation {
 }
 
 export function validateItems(
-  s: Pick<Settings, "minPerFile" | "sheetWidthMm" | "sheetHeightMm" | "sheetMarginMm" | "stickerGapMm" | "minStickerMm">,
+  s: Pick<
+    Settings,
+    "minPerFile" | "sheetWidthMm" | "sheetHeightMm" | "sheetMarginMm" | "stickerGapMm" | "cornerMarkMm" | "minStickerMm"
+  >,
   items: (QuoteItemInput & {
     checkLevel?: string | null;
     acceptRisk?: boolean;

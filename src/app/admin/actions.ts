@@ -245,6 +245,7 @@ export async function updateSettings(data: Settings): Promise<Result> {
     s.fileRetentionDays,
     s.maxFileMb,
     s.sheetMarginMm,
+    s.cornerMarkMm,
     s.stickerGapMm,
     s.minStickerMm,
   ];
