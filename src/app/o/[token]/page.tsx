@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { CheckBadge, CopyButton } from "@/components/ui";
-import { STATUS_FLOW, STATUS_LABEL, carrierInfo, productLabel, trackingUrl } from "@/lib/constants";
+import { STATUS_FLOW, STATUS_LABEL, carrierInfo, productLabel, shapeLabel, trackingUrl } from "@/lib/constants";
+import { sizeText } from "@/lib/sticker-size";
 import { baht, formatAddress, thaiDate } from "@/lib/format";
 import { toNextFree } from "@/lib/pricing";
 import { getItems, getOrderByToken, getPoints, signedUrls } from "@/lib/server/orders";
@@ -115,7 +116,12 @@ export default async function OrderStatusPage({ params }: { params: Promise<{ to
               </p>
               {i.reupload_reason && <p className="mt-1 text-sm">เหตุผล: {i.reupload_reason}</p>}
               <div className="mt-2">
-                <ReuploadButton token={token} itemId={i.id} settings={pub} />
+                <ReuploadButton
+                  token={token}
+                  itemId={i.id}
+                  settings={pub}
+                  size={i.shape && i.width_mm ? { shape: i.shape, widthMm: Number(i.width_mm), heightMm: Number(i.height_mm) } : null}
+                />
               </div>
             </div>
           ))}
@@ -135,6 +141,11 @@ export default async function OrderStatusPage({ params }: { params: Promise<{ to
             <div className="min-w-0 flex-1 text-sm">
               <p className="truncate font-medium">{i.file_name}</p>
               <p className="text-muted">{productLabel(i.product, i.finish)}</p>
+              {i.shape && (
+                <p className="text-muted">
+                  ไดคัท{shapeLabel(i.shape)} {sizeText({ shape: i.shape, widthMm: Number(i.width_mm), heightMm: Number(i.height_mm) })}
+                </p>
+              )}
               <p className="text-muted">
                 {i.qty} แผ่น × {baht(Number(i.unit_price))}
                 {i.free_qty > 0 && <span className="text-ok"> + แถม {i.free_qty}</span>}

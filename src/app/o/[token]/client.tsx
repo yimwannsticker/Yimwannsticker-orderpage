@@ -7,9 +7,20 @@ import { validateFile } from "@/components/order/useArtworkUploader";
 import { Alert, CheckBadge, CheckDetails, Spinner } from "@/components/ui";
 import { processArtwork } from "@/lib/client/file-tools";
 import { ACCEPT_ATTR } from "@/lib/constants";
+import { applySize, type StickerSize } from "@/lib/sticker-size";
 import type { CheckResult, PublicSettings } from "@/lib/types";
 
-export function ReuploadButton({ token, itemId, settings }: { token: string; itemId: string; settings: PublicSettings }) {
+export function ReuploadButton({
+  token,
+  itemId,
+  settings,
+  size,
+}: {
+  token: string;
+  itemId: string;
+  settings: PublicSettings;
+  size: StickerSize | null;
+}) {
   const router = useRouter();
   const input = useRef<HTMLInputElement>(null);
   const [state, setState] = useState<{ phase: string; progress?: number } | null>(null);
@@ -23,10 +34,11 @@ export function ReuploadButton({ token, itemId, settings }: { token: string; ite
     if (err) return setError(err);
     setState({ phase: "uploading", progress: 0 });
     try {
-      const r = await processArtwork(file, settings, (u) =>
+      const r = await processArtwork(file, (u) =>
         setState((s) => ({ phase: u.phase ?? s?.phase ?? "uploading", progress: u.progress ?? s?.progress })),
       );
-      setCheck(r.check);
+      // แสดงผลตรวจตามขนาดดวงของรายการนี้
+      setCheck(applySize(r.check, size, settings));
       const res = await fetch(`/api/orders/${token}/reupload`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },

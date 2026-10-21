@@ -1,9 +1,11 @@
 "use client";
 
-import { PP_FINISHES, PRODUCTS } from "@/lib/constants";
+import { useState } from "react";
+import { PP_FINISHES, PRODUCTS, SHAPES } from "@/lib/constants";
 import { baht, fileSizeText } from "@/lib/format";
 import type { QuoteLine } from "@/lib/pricing";
-import type { DraftItem, ProductKey, PublicSettings } from "@/lib/types";
+import { applySize, cm, fileAspect, itemCheck, maxSharpText, perSheet } from "@/lib/sticker-size";
+import type { CheckResult, DraftItem, ProductKey, PublicSettings, Shape } from "@/lib/types";
 import { CheckBadge, CheckDetails, FileIcon, NumberStepper, Spinner } from "../ui";
 
 function Thumb({ item, size = "h-20 w-20" }: { item: DraftItem; size?: string }) {
@@ -19,7 +21,7 @@ function Thumb({ item, size = "h-20 w-20" }: { item: DraftItem; size?: string })
   );
 }
 
-function StatusLine({ item }: { item: DraftItem }) {
+function StatusLine({ item, check = item.check }: { item: DraftItem; check?: CheckResult | null }) {
   if (item.status === "uploading")
     return (
       <div className="mt-2">
@@ -45,13 +47,15 @@ function StatusLine({ item }: { item: DraftItem }) {
           ↻ ไฟล์เดิมจาก {item.source.orderNo}
         </span>
       )}
-      {item.check && <CheckBadge level={item.check.level} title={item.check.title} />}
+      {check && <CheckBadge level={check.level} title={check.title} />}
     </div>
   );
 }
 
 /** การ์ดไฟล์ในขั้นอัปโหลด: เน้นผลตรวจไฟล์ */
-export function UploadRow({ item, onRemove }: { item: DraftItem; onRemove: () => void }) {
+export function UploadRow({ item, settings, onRemove }: { item: DraftItem; settings: PublicSettings; onRemove: () => void }) {
+  const check = applySize(item.check, null, settings);
+  const sharp = maxSharpText(item.check, settings);
   return (
     <div className="card">
       <div className="flex gap-3">
@@ -66,10 +70,17 @@ export function UploadRow({ item, onRemove }: { item: DraftItem; onRemove: () =>
             </button>
           </div>
           <p className="text-xs text-muted">{fileSizeText(item.fileSize)}</p>
-          <StatusLine item={item} />
+          <StatusLine item={item} check={check} />
         </div>
       </div>
-      {item.status === "done" && item.check && <CheckDetails check={item.check} />}
+      {item.status === "done" && check && (
+        <>
+          <CheckDetails check={check} />
+          <p className="mt-2 text-sm text-muted">
+            {sharp ?? "ความคมชัดจะคำนวณตามขนาดดวงที่เลือกในขั้นถัดไป"}
+          </p>
+        </>
+      )}
     </div>
   );
 }
@@ -150,6 +161,156 @@ function ProductPicker({ value, onChange }: { value: ProductKey | null; onChange
   );
 }
 
+/** ช่องกรอกขนาดเป็นเซนติเมตร (เก็บค่าเป็นมิลลิเมตร) */
+function CmInput({ id, label, mm, onChange }: { id: string; label: string; mm: number | null; onChange: (mm: number | null) => void }) {
+  const [text, setText] = useState<string | null>(null);
+  return (
+    <div className="min-w-0 flex-1">
+      <label className="label" htmlFor={id}>
+        {label}
+      </label>
+      <div className="relative">
+        <input
+          id={id}
+          className="input pr-12 text-lg font-semibold"
+          inputMode="decimal"
+          placeholder="0"
+          value={text ?? (mm ? cm(mm) : "")}
+          onFocus={() => setText(mm ? cm(mm) : "")}
+          onChange={(e) => {
+            const t = e.target.value.replace(/[^\d.]/g, "");
+            setText(t);
+            const v = parseFloat(t);
+            onChange(Number.isFinite(v) && v > 0 ? Math.round(v * 10) : null);
+          }}
+          onBlur={() => setText(null)}
+        />
+        <span className="pointer-events-none absolute inset-y-0 right-4 flex items-center text-sm text-muted">ซม.</span>
+      </div>
+    </div>
+  );
+}
+
+const SHAPE_ICON: Record<Shape, React.ReactNode> = {
+  rect: <span className="block h-6 w-6 rounded-[4px] border-2 border-current" />,
+  circle: <span className="block h-6 w-6 rounded-full border-2 border-current" />,
+  freeform: (
+    <svg viewBox="0 0 24 24" className="h-6 w-6" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
+      <path d="M12 3c2 3 6 2 7 5s-2 4-1 7-3 5-6 4-4 1-6-2 0-4-1-7 2-5 4-5 2-2 3-2Z" strokeLinejoin="round" />
+    </svg>
+  ),
+};
+
+/** เลือกทรงไดคัทและขนาดดวง */
+function SizePicker({ item, settings, onChange }: { item: DraftItem; settings: PublicSettings; onChange: (p: Partial<DraftItem>) => void }) {
+  const aspect = fileAspect(item.check);
+  const [lock, setLock] = useState(Boolean(aspect));
+  const circle = item.shape === "circle";
+  const count = item.widthMm && item.heightMm ? perSheet(item.widthMm, item.heightMm, settings) : 0;
+  const [want, setWant] = useState("");
+  const sharp = maxSharpText(item.check, settings);
+
+  const setW = (w: number | null) =>
+    onChange(circle ? { widthMm: w, heightMm: w } : { widthMm: w, ...(lock && aspect && w ? { heightMm: Math.round(w / aspect) } : {}) });
+  const setH = (h: number | null) => onChange({ heightMm: h, ...(lock && aspect && h ? { widthMm: Math.round(h * aspect) } : {}) });
+
+  return (
+    <div className="space-y-3 rounded-2xl bg-gray-50 p-3">
+      <div>
+        <p className="label">รูปทรงไดคัท</p>
+        <div className="grid grid-cols-3 gap-2" role="radiogroup" aria-label="รูปทรงไดคัท">
+          {SHAPES.map((x) => (
+            <button
+              key={x.key}
+              type="button"
+              role="radio"
+              aria-checked={item.shape === x.key}
+              onClick={() =>
+                onChange(
+                  x.key === "circle" && item.widthMm
+                    ? { shape: x.key, heightMm: item.widthMm }
+                    : { shape: x.key },
+                )
+              }
+              className={`flex min-h-16 flex-col items-center justify-center gap-1 rounded-xl border-2 text-sm font-semibold ${
+                item.shape === x.key ? "border-brand-500 bg-brand-50 text-brand-700" : "border-line bg-white text-ink"
+              }`}
+            >
+              {SHAPE_ICON[x.key]}
+              {x.label}
+            </button>
+          ))}
+        </div>
+        {item.shape && <p className="mt-1.5 text-xs text-muted">{SHAPES.find((x) => x.key === item.shape)?.hint}</p>}
+        {item.shape === "freeform" && (
+          <p className="mt-1 text-xs text-muted">แนะนำไฟล์ PNG พื้นหลังโปร่งใส หรือไฟล์ AI/PDF ที่มีเส้นไดคัท (ถ้าไม่มี กราฟิกจะทำเส้นตัดให้)</p>
+        )}
+      </div>
+
+      {item.shape && (
+        <div className="space-y-2">
+          <p className="label !mb-0">ขนาดต่อดวง</p>
+          <div className="flex items-end gap-2">
+            {circle ? (
+              <CmInput id={`w-${item.key}`} label="เส้นผ่านศูนย์กลาง" mm={item.widthMm} onChange={setW} />
+            ) : (
+              <>
+                <CmInput id={`w-${item.key}`} label="กว้าง" mm={item.widthMm} onChange={setW} />
+                <span className="pb-3 text-muted">×</span>
+                <CmInput id={`h-${item.key}`} label="ยาว" mm={item.heightMm} onChange={setH} />
+              </>
+            )}
+          </div>
+          {!circle && aspect && (
+            <label className="flex items-center gap-2 text-sm">
+              <input
+                type="checkbox"
+                className="h-4 w-4 accent-brand-500"
+                checked={lock}
+                onChange={(e) => {
+                  setLock(e.target.checked);
+                  if (e.target.checked && item.widthMm) onChange({ heightMm: Math.round(item.widthMm / aspect) });
+                }}
+              />
+              ล็อกสัดส่วนตามไฟล์
+            </label>
+          )}
+          {sharp && <p className="text-xs text-muted">{sharp}</p>}
+          {count > 0 && (
+            <div className="rounded-xl bg-white p-3 text-sm">
+              <p>
+                แผ่น {settings.sheetName} 1 แผ่น ได้ประมาณ <b>{count} ดวง</b>
+                <span className="text-muted"> · {item.qty} แผ่น ≈ {(count * item.qty).toLocaleString("th-TH")} ดวง</span>
+              </p>
+              <div className="mt-2 flex flex-wrap items-center gap-2">
+                <label htmlFor={`want-${item.key}`} className="shrink-0 text-muted">
+                  ต้องการกี่ดวง?
+                </label>
+                <input
+                  id={`want-${item.key}`}
+                  className="input !min-h-10 w-24 text-center"
+                  inputMode="numeric"
+                  value={want}
+                  onChange={(e) => setWant(e.target.value.replace(/\D/g, ""))}
+                />
+                <button
+                  type="button"
+                  className="btn-secondary btn-sm"
+                  disabled={!Number(want)}
+                  onClick={() => onChange({ qty: Math.max(settings.minPerFile, Math.ceil(Number(want) / count)) })}
+                >
+                  คำนวณแผ่น
+                </button>
+              </div>
+            </div>
+          )}
+          {item.widthMm && item.heightMm && count === 0 && <p className="text-sm text-bad">ขนาดดวงใหญ่เกินแผ่น {settings.sheetName}</p>}
+        </div>
+      )}
+    </div>
+  );
+}
+
 /** การ์ดไฟล์ในขั้นเลือกสินค้า */
 export function ItemCard({
   item,
@@ -166,6 +327,7 @@ export function ItemCard({
   onChange: (p: Partial<DraftItem>) => void;
   onRemove: () => void;
 }) {
+  const check = itemCheck(item, settings);
   return (
     <div className="card space-y-4">
       <div className="flex gap-3">
@@ -180,12 +342,14 @@ export function ItemCard({
           <p className="truncate font-medium" title={item.fileName}>
             {item.fileName}
           </p>
-          <StatusLine item={item} />
+          <StatusLine item={item} check={check} />
         </div>
       </div>
 
-      {item.status === "done" && item.check && item.check.level !== "green" && (
-        <CheckDetails check={item.check} defaultOpen={item.check.level === "red"} />
+      <SizePicker item={item} settings={settings} onChange={onChange} />
+
+      {item.status === "done" && check && check.level !== "green" && (
+        <CheckDetails check={check} defaultOpen={check.level === "red"} />
       )}
       {item.source?.prevApproved ? (
         <p className="rounded-xl bg-gray-50 px-3 py-2 text-sm text-muted">
@@ -194,7 +358,7 @@ export function ItemCard({
             : "ใช้ไฟล์เดียวกับครั้งก่อน พิมพ์ตามไฟล์เดิม"}
         </p>
       ) : (
-        item.check?.level === "red" && <RedFileChoice item={item} fixFee={settings.fixFileFee} onChange={onChange} />
+        check?.level === "red" && <RedFileChoice item={item} fixFee={settings.fixFileFee} onChange={onChange} />
       )}
 
       <div>
@@ -224,17 +388,14 @@ export function ItemCard({
         </div>
       )}
 
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <p className="label">ขนาดแผ่น</p>
-          <p className="flex min-h-12 items-center rounded-xl bg-gray-50 px-4 font-semibold">
-            {settings.sheetName} <span className="ml-1 text-sm font-normal text-muted">({settings.sheetWidthMm}×{settings.sheetHeightMm} มม.)</span>
-          </p>
-        </div>
-        <div>
-          <p className="label">จำนวนแผ่น (ขั้นต่ำ {settings.minPerFile})</p>
-          <NumberStepper label="จำนวนแผ่น" value={item.qty} min={settings.minPerFile} onChange={(qty) => onChange({ qty })} />
-        </div>
+      <div>
+        <p className="label">
+          จำนวนแผ่น {settings.sheetName} (ขั้นต่ำ {settings.minPerFile} แผ่น)
+        </p>
+        <NumberStepper label="จำนวนแผ่น" value={item.qty} min={settings.minPerFile} onChange={(qty) => onChange({ qty })} />
+        <p className="mt-1 text-xs text-muted">
+          แผ่นขนาด {cm(settings.sheetWidthMm)} × {cm(settings.sheetHeightMm)} ซม. ร้านจัดเรียงดวงให้เต็มแผ่น
+        </p>
       </div>
 
       {item.product && line && (

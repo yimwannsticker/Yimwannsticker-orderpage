@@ -46,6 +46,9 @@ describe("computeQuote", () => {
     expect(q.fixFeeTotal).toBe(50);
     expect(q.total).toBe(300 * 23 + 50);
     expect(q.nudge).toBeNull();
+    expect(validateItems(S, [{ ...Z, shape: null, product: "paper", qty: 5 }], 0).message).toContain("รูปทรง");
+    expect(validateItems(S, [{ ...Z, widthMm: 5, product: "paper", qty: 5 }], 0).message).toContain("เล็กสุด");
+    expect(validateItems(S, [{ ...Z, widthMm: 500, heightMm: 500, product: "paper", qty: 5 }], 0).message).toContain("ใหญ่เกิน");
   });
 });
 
@@ -61,15 +64,23 @@ describe("โปรสะสม", () => {
     const q = computeQuote(S, [{ product: "paper", qty: 30 }], 50);
     expect(q.freeSheets).toBe(0);
     expect(q.toNextFree).toBe(20);
+    expect(validateItems(S, [{ ...Z, shape: null, product: "paper", qty: 5 }], 0).message).toContain("รูปทรง");
+    expect(validateItems(S, [{ ...Z, widthMm: 5, product: "paper", qty: 5 }], 0).message).toContain("เล็กสุด");
+    expect(validateItems(S, [{ ...Z, widthMm: 500, heightMm: 500, product: "paper", qty: 5 }], 0).message).toContain("ใหญ่เกิน");
   });
 });
 
+const Z = { shape: "rect" as const, widthMm: 50, heightMm: 50 };
+
 describe("validateItems", () => {
   it("ตรวจขั้นต่ำ ไฟล์แดง และแผ่นแถม", () => {
-    expect(validateItems(S, [{ product: "paper", qty: 4 }], 0).ok).toBe(false);
-    expect(validateItems(S, [{ product: "paper", qty: 5, checkLevel: "red" }], 0).ok).toBe(false);
-    expect(validateItems(S, [{ product: "paper", qty: 5, checkLevel: "red", acceptRisk: true }], 0).ok).toBe(true);
-    expect(validateItems(S, [{ product: "paper", qty: 100, freeQty: 3 }], 5).ok).toBe(false);
-    expect(validateItems(S, [{ product: "paper", qty: 100, freeQty: 5 }], 5).ok).toBe(true);
+    expect(validateItems(S, [{ ...Z, product: "paper", qty: 4 }], 0).ok).toBe(false);
+    expect(validateItems(S, [{ ...Z, product: "paper", qty: 5, checkLevel: "red" }], 0).ok).toBe(false);
+    expect(validateItems(S, [{ ...Z, product: "paper", qty: 5, checkLevel: "red", acceptRisk: true }], 0).ok).toBe(true);
+    expect(validateItems(S, [{ ...Z, product: "paper", qty: 100, freeQty: 3 }], 5).ok).toBe(false);
+    expect(validateItems(S, [{ ...Z, product: "paper", qty: 100, freeQty: 5 }], 5).ok).toBe(true);
+    expect(validateItems(S, [{ ...Z, shape: null, product: "paper", qty: 5 }], 0).message).toContain("รูปทรง");
+    expect(validateItems(S, [{ ...Z, widthMm: 5, product: "paper", qty: 5 }], 0).message).toContain("เล็กสุด");
+    expect(validateItems(S, [{ ...Z, widthMm: 500, heightMm: 500, product: "paper", qty: 5 }], 0).message).toContain("ใหญ่เกิน");
   });
 });

@@ -225,7 +225,19 @@ export async function adjustPoints(phone: string, adjustment: number, note: stri
 export async function updateSettings(data: Settings): Promise<Result> {
   await requireStaff("admin");
   const s = mergeSettings(data);
-  const nums = [s.minPerFile, s.shippingFee, s.freeShippingMin, s.fixFileFee, s.dpiGood, s.dpiMin, s.fileRetentionDays, s.maxFileMb];
+  const nums = [
+    s.minPerFile,
+    s.shippingFee,
+    s.freeShippingMin,
+    s.fixFileFee,
+    s.dpiGood,
+    s.dpiMin,
+    s.fileRetentionDays,
+    s.maxFileMb,
+    s.sheetMarginMm,
+    s.stickerGapMm,
+    s.minStickerMm,
+  ];
   if (nums.some((n) => !Number.isFinite(n) || n < 0)) return { ok: false, error: "ตัวเลขต้องไม่ติดลบ" };
   if (s.dpiMin > s.dpiGood) return { ok: false, error: "เกณฑ์ DPI ขั้นต่ำต้องน้อยกว่าเกณฑ์พร้อมพิมพ์" };
   if (!s.tiers.length || s.tiers.some((t) => !(t.min > 0) || !(t.paper >= 0) || !(t.pp >= 0)))

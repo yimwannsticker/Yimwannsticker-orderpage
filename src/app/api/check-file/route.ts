@@ -3,7 +3,6 @@ import { STORAGE_BUCKET, fileExt } from "@/lib/constants";
 import { checkPdfLike } from "@/lib/check/pdf-server";
 import { checkPsd } from "@/lib/check/psd-server";
 import { bad, readJson } from "@/lib/server/http";
-import { getSettings } from "@/lib/server/settings";
 import { db } from "@/lib/supabase/admin";
 import type { CheckResult } from "@/lib/types";
 
@@ -27,12 +26,11 @@ export async function POST(req: Request) {
   const ext = fileExt(up.file_name);
   let result: CheckResult;
   if (ext === "pdf" || ext === "ai" || ext === "psd") {
-    const settings = await getSettings();
     const { data: blob, error } = await db().storage.from(STORAGE_BUCKET).download(up.path);
     if (error || !blob) return bad("ยังอัปโหลดไฟล์ไม่เสร็จ กรุณาลองใหม่", 409);
     const buf = Buffer.from(await blob.arrayBuffer());
     try {
-      result = ext === "psd" ? checkPsd(buf, settings) : await checkPdfLike(buf, ext, settings);
+      result = ext === "psd" ? checkPsd(buf) : await checkPdfLike(buf, ext);
     } catch (e) {
       console.error("check failed", e);
       result = {

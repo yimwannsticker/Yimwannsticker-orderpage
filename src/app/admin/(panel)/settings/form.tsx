@@ -153,7 +153,8 @@ export function SettingsForm({
         <p className="text-xs text-muted">นับเฉพาะแผ่นที่ชำระเงินแล้ว (ไม่นับแผ่นแถม) ยึดเบอร์โทรเป็นหลัก</p>
       </Section>
 
-      <Section title="ตรวจไฟล์และขนาดแผ่น">
+      <Section title="ตรวจไฟล์ ขนาดแผ่น และการจัดเรียงดวง">
+        <p className="text-sm text-muted">ความคมชัดคำนวณจากขนาดพิกเซลของไฟล์เทียบกับขนาดดวงที่ลูกค้าเลือก</p>
         <div className="grid gap-4 sm:grid-cols-2">
           <Num label="พร้อมพิมพ์ (สีเขียว) ตั้งแต่" value={s.dpiGood} onChange={(v) => set("dpiGood", v)} suffix="DPI" />
           <Num label="พิมพ์ได้แต่ระวัง (สีเหลือง) ตั้งแต่" value={s.dpiMin} onChange={(v) => set("dpiMin", v)} suffix="DPI" hint="ต่ำกว่านี้ = สีแดง ต้องแก้ไฟล์" />
@@ -162,6 +163,9 @@ export function SettingsForm({
             <Num label="กว้าง" value={s.sheetWidthMm} onChange={(v) => set("sheetWidthMm", v)} suffix="มม." />
             <Num label="ยาว" value={s.sheetHeightMm} onChange={(v) => set("sheetHeightMm", v)} suffix="มม." />
           </div>
+          <Num label="เว้นขอบแผ่น (ใช้ประมาณจำนวนดวงต่อแผ่น)" value={s.sheetMarginMm} onChange={(v) => set("sheetMarginMm", v)} suffix="มม." />
+          <Num label="ระยะห่างระหว่างดวง" value={s.stickerGapMm} onChange={(v) => set("stickerGapMm", v)} suffix="มม." />
+          <Num label="ขนาดดวงเล็กสุดที่รับ" value={s.minStickerMm} onChange={(v) => set("minStickerMm", v)} suffix="มม." />
           <Num label="ขนาดไฟล์สูงสุด" value={s.maxFileMb} onChange={(v) => set("maxFileMb", v)} suffix="MB" hint="Supabase แพ็กเกจฟรีรับได้ไฟล์ละ 50MB" />
           <Num label="ลบไฟล์อัตโนมัติหลังส่งของ" value={s.fileRetentionDays} onChange={(v) => set("fileRetentionDays", v)} suffix="วัน" />
         </div>

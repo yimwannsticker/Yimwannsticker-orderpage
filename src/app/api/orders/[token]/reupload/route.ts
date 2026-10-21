@@ -3,6 +3,7 @@ import { notifyShop, siteUrl } from "@/lib/server/email";
 import { bad, readJson } from "@/lib/server/http";
 import { getOrderByToken, removeIfUnreferenced } from "@/lib/server/orders";
 import { getSettings } from "@/lib/server/settings";
+import { applySize } from "@/lib/sticker-size";
 import { db } from "@/lib/supabase/admin";
 
 /** ลูกค้าส่งไฟล์ใหม่แทนไฟล์ที่ร้านขอให้แก้ */
@@ -16,7 +17,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
   if (!body?.itemId || !body.uploadId) return bad("ข้อมูลไม่ครบ");
   const { data: item } = await db()
     .from("order_items")
-    .select("id, position, file_path, preview_path, reupload_requested")
+    .select("id, position, file_path, preview_path, reupload_requested, shape, width_mm, height_mm")
     .eq("id", body.itemId)
     .eq("order_id", order.id)
     .maybeSingle();
@@ -31,6 +32,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
   const pv = ups?.find((u) => u.id === body.previewUploadId && u.kind === "preview");
   if (!up || up.kind !== "artwork" || up.used) return bad("อัปโหลดไฟล์ไม่สำเร็จ กรุณาลองใหม่");
 
+  const settings = await getSettings();
   const { error } = await db()
     .from("order_items")
     .update({
@@ -38,7 +40,12 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
       file_name: up.file_name,
       file_size: up.size,
       preview_path: pv?.path ?? null,
-      check_result: up.check_result,
+      // ตรวจความคมชัดตามขนาดดวงเดิมของรายการนี้
+      check_result: applySize(
+        up.check_result,
+        item.shape && item.width_mm ? { shape: item.shape, widthMm: Number(item.width_mm), heightMm: Number(item.height_mm) } : null,
+        settings,
+      ),
       reupload_requested: false,
       reuploaded_at: new Date().toISOString(),
     })
@@ -52,7 +59,6 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
     .from("orders")
     .update({ needs_attention: true, attention_note: `ลูกค้าส่งไฟล์ใหม่ (รายการที่ ${item.position})` })
     .eq("id", order.id);
-  const settings = await getSettings();
   await notifyShop(
     settings.notifyEmail,
     `ไฟล์ใหม่ ${order.order_no}`,

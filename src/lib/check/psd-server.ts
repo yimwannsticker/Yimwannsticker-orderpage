@@ -1,7 +1,7 @@
 import "server-only";
 import { readPsd } from "ag-psd";
 import type { CheckResult } from "../types";
-import { finalize, rasterCheck, type CheckSettings } from "./rules";
+import { finalize, rasterCheck } from "./rules";
 
 const COLOR_MODES: Record<number, string> = {
   0: "Bitmap",
@@ -26,7 +26,7 @@ export function readPsdHeader(buf: Buffer) {
   };
 }
 
-export function checkPsd(buf: Buffer, s: CheckSettings): CheckResult {
+export function checkPsd(buf: Buffer): CheckResult {
   const header = readPsdHeader(buf);
   if (!header) {
     return finalize([{ level: "red", message: "เปิดไฟล์ PSD ไม่ได้ ไฟล์อาจเสียหาย กรุณาบันทึกใหม่" }], { kind: "psd" }, "server");
@@ -47,7 +47,7 @@ export function checkPsd(buf: Buffer, s: CheckSettings): CheckResult {
   } catch {
     // ใช้ค่าจาก header
   }
-  const result = rasterCheck(width, height, COLOR_MODES[mode] ?? `โหมด ${mode}`, s, "server", "psd");
+  const result = rasterCheck(width, height, COLOR_MODES[mode] ?? `โหมด ${mode}`, "server", "psd");
   if (header.version === 2) result.info.kind = "psb";
   return result;
 }

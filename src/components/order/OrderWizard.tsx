@@ -2,7 +2,8 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { productLabel } from "@/lib/constants";
+import { productLabel, shapeLabel } from "@/lib/constants";
+import { itemCheck, perSheet, sizeText } from "@/lib/sticker-size";
 import { baht, isValidPhone, normalizePhone } from "@/lib/format";
 import { computeQuote, defaultFreeAllocation, nudgeText, validateItems } from "@/lib/pricing";
 import type { DraftItem, PublicSettings } from "@/lib/types";
@@ -33,6 +34,9 @@ interface ReorderData {
     product: NonNullable<DraftItem["product"]>;
     finish: DraftItem["finish"];
     qty: number;
+    shape: DraftItem["shape"];
+    widthMm: number | null;
+    heightMm: number | null;
     prevApproved: boolean;
     prevFixed: boolean;
   }[];
@@ -127,6 +131,9 @@ export function OrderWizard({ settings }: { settings: PublicSettings }) {
             product: i.product,
             finish: i.finish,
             qty: Math.max(i.qty, settings.minPerFile),
+            shape: i.shape,
+            widthMm: i.widthMm,
+            heightMm: i.heightMm,
             acceptRisk: false,
             fixService: false,
             source: { token, itemId: i.itemId, orderNo: d.orderNo, prevApproved: i.prevApproved, prevFixed: i.prevFixed },
@@ -168,6 +175,9 @@ export function OrderWizard({ settings }: { settings: PublicSettings }) {
           product: f.product,
           finish: f.finish,
           qty: Math.max(f.qty, settings.minPerFile),
+          shape: f.shape,
+          widthMm: f.widthMm,
+          heightMm: f.heightMm,
           acceptRisk: false,
           fixService: false,
           source: { grant: f.grant, itemId: f.itemId, orderNo: f.orderNo, prevApproved: f.prevApproved, prevFixed: f.prevFixed },
@@ -231,7 +241,7 @@ export function OrderWizard({ settings }: { settings: PublicSettings }) {
       if (busy) return setError("กรุณารอให้อัปโหลดและตรวจไฟล์เสร็จก่อน");
       const v = validateItems(
         settings,
-        doneItems.map((i) => ({ ...i, freeQty: 0, checkLevel: i.source?.prevApproved ? null : i.check?.level })),
+        doneItems.map((i) => ({ ...i, freeQty: 0, checkLevel: i.source?.prevApproved ? null : itemCheck(i, settings)?.level })),
         0,
       );
       if (!v.ok) return setError(v.message!);
@@ -253,7 +263,7 @@ export function OrderWizard({ settings }: { settings: PublicSettings }) {
     setError(null);
     const v = validateItems(
       settings,
-      withFree.map((i) => ({ ...i, checkLevel: i.source?.prevApproved ? null : i.check?.level })),
+      withFree.map((i) => ({ ...i, checkLevel: i.source?.prevApproved ? null : itemCheck(i, settings)?.level })),
       quote.freeSheets,
     );
     if (!v.ok) return setError(v.message!);
@@ -274,6 +284,9 @@ export function OrderWizard({ settings }: { settings: PublicSettings }) {
             freeQty: i.freeQty,
             acceptRisk: i.acceptRisk,
             fixService: i.fixService,
+            shape: i.shape,
+            widthMm: i.widthMm,
+            heightMm: i.heightMm,
             reorder: i.source
               ? i.source.grant
                 ? { grant: i.source.grant }
@@ -347,7 +360,7 @@ export function OrderWizard({ settings }: { settings: PublicSettings }) {
             ↻ เลือกจากไฟล์ที่เคยสั่ง
           </button>
           {items.map((it) => (
-            <UploadRow key={it.key} item={it} onRemove={() => remove(it.key)} />
+            <UploadRow key={it.key} item={it} settings={settings} onRemove={() => remove(it.key)} />
           ))}
         </section>
       )}
@@ -401,6 +414,10 @@ export function OrderWizard({ settings }: { settings: PublicSettings }) {
                 <div className="min-w-0 flex-1 text-sm">
                   <p className="truncate font-medium">{it.fileName}</p>
                   <p className="text-muted">{it.product && productLabel(it.product, it.finish)}</p>
+                  <p className="text-muted">
+                    ไดคัท{shapeLabel(it.shape)} {sizeText(it)}
+                    {it.widthMm && it.heightMm ? ` · แผ่นละ ~${perSheet(it.widthMm, it.heightMm, settings)} ดวง` : ""}
+                  </p>
                   <p className="text-muted">
                     {it.qty} แผ่น × {baht(quote.lines[idx]?.unitPrice ?? 0)}
                     {it.freeQty > 0 && <span className="font-semibold text-ok"> + แถม {it.freeQty} แผ่น</span>}

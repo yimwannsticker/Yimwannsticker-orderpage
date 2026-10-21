@@ -1,4 +1,5 @@
-import type { PriceTier, ProductKey, Settings } from "./types";
+import { validateSize } from "./sticker-size";
+import type { PriceTier, ProductKey, Settings, Shape } from "./types";
 
 type PricingSettings = Pick<
   Settings,
@@ -149,12 +150,20 @@ export interface ItemValidation {
 }
 
 export function validateItems(
-  s: Pick<Settings, "minPerFile">,
-  items: (QuoteItemInput & { checkLevel?: string | null; acceptRisk?: boolean })[],
+  s: Pick<Settings, "minPerFile" | "sheetWidthMm" | "sheetHeightMm" | "sheetMarginMm" | "stickerGapMm" | "minStickerMm">,
+  items: (QuoteItemInput & {
+    checkLevel?: string | null;
+    acceptRisk?: boolean;
+    shape: Shape | null;
+    widthMm: number | null;
+    heightMm: number | null;
+  })[],
   freeSheets: number,
 ): ItemValidation {
   if (!items.length) return { ok: false, message: "ยังไม่มีไฟล์ในออเดอร์" };
   for (const [i, it] of items.entries()) {
+    const size = validateSize(it, s);
+    if (!size.ok) return { ok: false, message: `ไฟล์ที่ ${i + 1}: ${size.message}` };
     if (!it.product) return { ok: false, message: `ไฟล์ที่ ${i + 1}: กรุณาเลือกประเภทสติกเกอร์` };
     if (!Number.isInteger(it.qty) || it.qty < s.minPerFile)
       return { ok: false, message: `ไฟล์ที่ ${i + 1}: ขั้นต่ำ ${s.minPerFile} แผ่น` };

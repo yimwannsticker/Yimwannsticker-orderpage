@@ -20,6 +20,9 @@ export function newItem(file: File, minQty: number): DraftItem {
     product: null,
     finish: "matte",
     qty: minQty,
+    shape: null,
+    widthMm: null,
+    heightMm: null,
     acceptRisk: false,
     fixService: false,
   };
@@ -49,7 +52,7 @@ export function useArtworkUploader(
         }
         const item = newItem(file, settings.minPerFile);
         add(item);
-        processArtwork(file, settings, (u) => {
+        processArtwork(file, (u) => {
           const patch: Partial<DraftItem> = {};
           if (u.progress !== undefined) patch.progress = u.progress;
           if (u.phase === "checking") patch.status = "checking";

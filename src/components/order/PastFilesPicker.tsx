@@ -1,7 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { productLabel } from "@/lib/constants";
+import { productLabel, shapeLabel } from "@/lib/constants";
+import { sizeText } from "@/lib/sticker-size";
 import { thaiDate } from "@/lib/format";
 import type { DraftItem } from "@/lib/types";
 import { Alert, FileIcon, Spinner } from "../ui";
@@ -17,6 +18,9 @@ export interface PastFile {
   product: NonNullable<DraftItem["product"]>;
   finish: DraftItem["finish"];
   qty: number;
+  shape: DraftItem["shape"];
+  widthMm: number | null;
+  heightMm: number | null;
   orderNo: string;
   date: string;
   times: number;
@@ -166,6 +170,9 @@ export function PastFilesPicker({
                         </span>
                         <span className="block text-muted">
                           {productLabel(f.product, f.finish)} · {f.qty} แผ่น
+                        </span>
+                        <span className="block text-muted">
+                          {shapeLabel(f.shape)} {sizeText(f)}
                         </span>
                         <span className="block text-muted">
                           ล่าสุด {f.orderNo} · {thaiDate(f.date).split(" ").slice(0, 3).join(" ")}

@@ -1,10 +1,13 @@
-import type { Finish, OrderStatus, ProductKey, Settings } from "./types";
+import type { Finish, OrderStatus, ProductKey, Settings, Shape } from "./types";
 
 export const DEFAULT_SETTINGS: Settings = {
   shopName: "Yimwann Sticker",
   sheetName: "A3+",
   sheetWidthMm: 330,
   sheetHeightMm: 483,
+  sheetMarginMm: 10,
+  stickerGapMm: 3,
+  minStickerMm: 10,
   tiers: [
     { min: 5, paper: 30, pp: 35 },
     { min: 10, paper: 25, pp: 29 },
@@ -54,6 +57,16 @@ export function productLabel(product: ProductKey, finish: Finish) {
   if (product === "paper") return PRODUCTS.paper.label;
   const f = PP_FINISHES.find((x) => x.key === finish);
   return `${PRODUCTS.pp.label} ${f?.label ?? ""}`.trim();
+}
+
+export const SHAPES: { key: Shape; label: string; hint: string }[] = [
+  { key: "rect", label: "สี่เหลี่ยม", hint: "ตัดเป็นสี่เหลี่ยมตามขนาด" },
+  { key: "circle", label: "วงกลม", hint: "ตัดเป็นวงกลมตามเส้นผ่านศูนย์กลาง" },
+  { key: "freeform", label: "ไดคัทตามทรง", hint: "ตัดตามรูปร่างของงาน เว้นขอบขาวเล็กน้อย" },
+];
+
+export function shapeLabel(shape: Shape | null | undefined) {
+  return SHAPES.find((x) => x.key === shape)?.label ?? "-";
 }
 
 export const STATUS_FLOW: OrderStatus[] = ["pending_slip", "paid", "producing", "shipped"];

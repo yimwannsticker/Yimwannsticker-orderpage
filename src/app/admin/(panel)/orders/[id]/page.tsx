@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { CheckBadge, CheckDetails, CopyButton } from "@/components/ui";
-import { STATUS_COLOR, STATUS_LABEL, carrierInfo, productLabel } from "@/lib/constants";
+import { STATUS_COLOR, STATUS_LABEL, carrierInfo, productLabel, shapeLabel } from "@/lib/constants";
+import { sizeText } from "@/lib/sticker-size";
 import { baht, fileSizeText, formatAddress, thaiDate } from "@/lib/format";
 import { requireStaff } from "@/lib/server/auth";
 import { getItems, getPoints, signedUrls, statusUrl, type OrderRow } from "@/lib/server/orders";
@@ -84,6 +85,12 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
                     </p>
                     <p className="text-muted">{fileSizeText(i.file_size)}</p>
                     <p>
+                      {i.shape && (
+                        <span className="mb-0.5 block font-semibold text-brand-700">
+                          ไดคัท{shapeLabel(i.shape)} {sizeText({ shape: i.shape, widthMm: Number(i.width_mm), heightMm: Number(i.height_mm) })}
+                          {i.per_sheet ? <span className="font-normal text-muted"> · แผ่นละ ~{i.per_sheet} ดวง</span> : null}
+                        </span>
+                      )}
                       <b>{productLabel(i.product, i.finish)}</b> · {i.qty} แผ่น
                       {i.free_qty > 0 && <span className="font-semibold text-ok"> + แถม {i.free_qty} แผ่น</span>}
                       <span className="text-muted"> (พิมพ์ทั้งหมด {i.qty + i.free_qty} แผ่น)</span>
@@ -120,7 +127,7 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
                       <span className="text-xs text-muted">
                         {[
                           i.check_result.info.widthPx && `${i.check_result.info.widthPx}×${i.check_result.info.heightPx}px`,
-                          i.check_result.info.dpi && `${i.check_result.info.dpi} DPI (เต็มแผ่น)`,
+                          i.check_result.info.dpi && `${i.check_result.info.dpi} DPI ที่ขนาดดวง`,
                           i.check_result.info.colorMode,
                           i.check_result.info.pageWidthMm && `หน้า ${i.check_result.info.pageWidthMm}×${i.check_result.info.pageHeightMm}มม.`,
                           i.check_result.info.pages && `${i.check_result.info.pages} หน้า`,

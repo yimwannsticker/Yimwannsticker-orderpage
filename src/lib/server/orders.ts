@@ -1,7 +1,7 @@
 import "server-only";
 import { STORAGE_BUCKET } from "../constants";
 import { db } from "../supabase/admin";
-import type { Address, CheckResult, Finish, OrderStatus, ProductKey } from "../types";
+import type { Address, CheckResult, Finish, OrderStatus, ProductKey, Shape } from "../types";
 import { pushTracking, messagingEnabled } from "./line";
 import { siteUrl } from "./email";
 import { getSettings } from "./settings";
@@ -63,6 +63,10 @@ export interface ItemRow {
   reupload_reason: string | null;
   reuploaded_at: string | null;
   reorder_of: string | null;
+  shape: Shape | null;
+  width_mm: number | null;
+  height_mm: number | null;
+  per_sheet: number | null;
 }
 
 export async function getPoints(phone: string) {

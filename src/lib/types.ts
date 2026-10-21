@@ -3,9 +3,14 @@ export type Finish = "gloss" | "matte" | "clear";
 
 export type CheckLevel = "green" | "yellow" | "red";
 
+/** รูปทรงไดคัท */
+export type Shape = "rect" | "circle" | "freeform";
+
 export interface CheckIssue {
   level: CheckLevel;
   message: string;
+  /** ปัญหาที่ขึ้นกับขนาดดวง/ทรงไดคัท คำนวณใหม่ทุกครั้งที่เปลี่ยนขนาด */
+  code?: "dpi" | "shape" | "size";
 }
 
 export interface CheckResult {
@@ -26,6 +31,7 @@ export interface CheckResult {
     fonts?: string[];
     missingLinks?: string[];
     minImageDpi?: number;
+    hasAlpha?: boolean;
     needsManualReview?: boolean;
   };
   checkedBy: "browser" | "server";
@@ -43,6 +49,12 @@ export interface Settings {
   sheetName: string;
   sheetWidthMm: number;
   sheetHeightMm: number;
+  /** ขอบแผ่นที่เว้นไว้ (มม.) ใช้ประมาณจำนวนดวงต่อแผ่น */
+  sheetMarginMm: number;
+  /** ระยะห่างระหว่างดวง (มม.) */
+  stickerGapMm: number;
+  /** ขนาดดวงเล็กสุดที่รับ (มม.) */
+  minStickerMm: number;
   tiers: PriceTier[];
   minPerFile: number;
   shippingFee: number;
@@ -96,6 +108,10 @@ export interface DraftItem {
   product: ProductKey | null;
   finish: Finish;
   qty: number;
+  shape: Shape | null;
+  /** ขนาดดวง (มม.) วงกลมใช้ widthMm = heightMm = เส้นผ่านศูนย์กลาง */
+  widthMm: number | null;
+  heightMm: number | null;
   acceptRisk: boolean;
   fixService: boolean;
   /** สั่งซ้ำ: ใช้ไฟล์จากออเดอร์เดิม ไม่ต้องอัปโหลดใหม่ */

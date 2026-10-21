@@ -1,7 +1,8 @@
 import crypto from "node:crypto";
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
-import { STORAGE_BUCKET, productLabel } from "@/lib/constants";
+import { STORAGE_BUCKET, productLabel, shapeLabel } from "@/lib/constants";
+import { applySize, perSheet, sizeText } from "@/lib/sticker-size";
 import { baht, formatAddress, isValidPhone, normalizePhone } from "@/lib/format";
 import { computeQuote, validateItems } from "@/lib/pricing";
 import { notifyShop, siteUrl } from "@/lib/server/email";
@@ -11,7 +12,7 @@ import { getSettings } from "@/lib/server/settings";
 import { LINE_COOKIE, verify, type FileGrant, type LineSession } from "@/lib/server/signed-cookie";
 import { verifySlip } from "@/lib/server/slip";
 import { db } from "@/lib/supabase/admin";
-import type { Address, CheckResult, Finish, ProductKey } from "@/lib/types";
+import type { Address, CheckResult, Finish, ProductKey, Shape } from "@/lib/types";
 
 export const maxDuration = 30;
 
@@ -25,6 +26,9 @@ interface Body {
     freeQty: number;
     acceptRisk: boolean;
     fixService: boolean;
+    shape: Shape;
+    widthMm: number;
+    heightMm: number;
     /**
      * สั่งซ้ำ: ใช้ไฟล์จากรายการในออเดอร์เดิม ยืนยันด้วย token ของออเดอร์นั้น
      * หรือ grant ที่ได้จากหน้า "ไฟล์ที่เคยสั่ง" (ยืนยันชื่อ + เบอร์แล้ว)
@@ -83,8 +87,16 @@ export async function POST(req: Request) {
     const product: ProductKey = it.product === "pp" ? "pp" : "paper";
     const finish: Finish =
       product === "paper" ? "gloss" : (["gloss", "matte", "clear"] as Finish[]).includes(it.finish) ? it.finish : "matte";
+    const shape: Shape | null = (["rect", "circle", "freeform"] as Shape[]).includes(it.shape) ? it.shape : null;
+    const widthMm = Math.round(Number(it.widthMm) * 10) / 10 || null;
+    const heightMm = shape === "circle" ? widthMm : Math.round(Number(it.heightMm) * 10) / 10 || null;
+    const size = shape && widthMm && heightMm ? { shape, widthMm, heightMm } : null;
     return {
       up,
+      shape,
+      widthMm,
+      heightMm,
+      perSheet: size ? perSheet(size.widthMm, size.heightMm, settings) : null,
       preview: pv && pv.kind === "preview" ? pv : null,
       product,
       finish,
@@ -92,7 +104,8 @@ export async function POST(req: Request) {
       freeQty: Math.floor(Number(it.freeQty) || 0),
       acceptRisk: Boolean(it.acceptRisk),
       fixService: Boolean(it.fixService),
-      check: (up?.check_result ?? null) as CheckResult | null,
+      // ความคมชัดคิดตามขนาดดวงที่เลือก
+      check: applySize((up?.check_result ?? null) as CheckResult | null, size, settings),
       reorderOf: src?.itemId ?? null,
       // ครั้งก่อนร้านแก้ไฟล์ให้แล้ว หรือลูกค้ายอมรับแล้ว ไม่ต้องเลือกใหม่
       prevApproved: src?.prevApproved ?? false,
@@ -167,6 +180,10 @@ export async function POST(req: Request) {
         order_id: order.id,
         position: idx + 1,
         reorder_of: it.reorderOf,
+        shape: it.shape,
+        width_mm: it.widthMm,
+        height_mm: it.heightMm,
+        per_sheet: it.perSheet,
         file_path: it.up.path,
         file_name: it.up.file_name,
         file_size: it.up.size,
@@ -206,7 +223,7 @@ export async function POST(req: Request) {
   }
 
   const lines = items
-    .map((it, i) => `${i + 1}. ${it.up.file_name} — ${productLabel(it.product, it.finish)} × ${it.qty}${it.freeQty ? ` (+แถม ${it.freeQty})` : ""}${it.check ? ` [${it.check.title}]` : ""}`)
+    .map((it, i) => `${i + 1}. ${it.up.file_name} — ${productLabel(it.product, it.finish)} ${shapeLabel(it.shape)} ${sizeText(it)} × ${it.qty}${it.freeQty ? ` (+แถม ${it.freeQty})` : ""}${it.check ? ` [${it.check.title}]` : ""}`)
     .join("\n");
   await notifyShop(
     settings.notifyEmail,

@@ -1,11 +1,13 @@
 "use client";
 
 import { fileExt } from "../constants";
-import { rasterCheck, type CheckSettings } from "../check/rules";
+import { rasterCheck } from "../check/rules";
 import type { CheckResult } from "../types";
 
 /** อ่านขนาดและโหมดสีจาก header ของ JPG/PNG (ไม่ต้องถอดรหัสรูปทั้งไฟล์) */
-export async function readImageHeader(file: File): Promise<{ width: number; height: number; colorMode: string } | null> {
+export async function readImageHeader(
+  file: File,
+): Promise<{ width: number; height: number; colorMode: string; hasAlpha: boolean } | null> {
   const buf = new Uint8Array(await file.slice(0, 512 * 1024).arrayBuffer());
   const ext = fileExt(file.name);
   if (ext === "png" || (buf[0] === 0x89 && buf[1] === 0x50)) {
@@ -16,6 +18,7 @@ export async function readImageHeader(file: File): Promise<{ width: number; heig
       width: dv.getUint32(16),
       height: dv.getUint32(20),
       colorMode: colorType === 0 || colorType === 4 ? "Grayscale" : "RGB",
+      hasAlpha: colorType === 4 || colorType === 6,
     };
   }
   if (buf[0] !== 0xff || buf[1] !== 0xd8) return null;
@@ -32,14 +35,14 @@ export async function readImageHeader(file: File): Promise<{ width: number; heig
       const height = (buf[i + 5] << 8) | buf[i + 6];
       const width = (buf[i + 7] << 8) | buf[i + 8];
       const comps = buf[i + 9];
-      return { width, height, colorMode: comps === 4 ? "CMYK" : comps === 1 ? "Grayscale" : "RGB" };
+      return { width, height, colorMode: comps === 4 ? "CMYK" : comps === 1 ? "Grayscale" : "RGB", hasAlpha: false };
     }
     i += 2 + len;
   }
   return null;
 }
 
-export async function checkImageInBrowser(file: File, s: CheckSettings): Promise<CheckResult> {
+export async function checkImageInBrowser(file: File): Promise<CheckResult> {
   const h = await readImageHeader(file);
   if (!h || !h.width || !h.height) {
     return {
@@ -50,7 +53,7 @@ export async function checkImageInBrowser(file: File, s: CheckSettings): Promise
       checkedBy: "browser",
     };
   }
-  return rasterCheck(h.width, h.height, h.colorMode, s, "browser", fileExt(file.name));
+  return rasterCheck(h.width, h.height, h.colorMode, "browser", fileExt(file.name), h.hasAlpha);
 }
 
 const PREVIEW_MAX = 720;
@@ -196,14 +199,13 @@ export async function requestCheck(uploadId: string, clientCheck: CheckResult | 
 /** อัปโหลดไฟล์งาน + รูปตัวอย่าง + ตรวจไฟล์ ครบในฟังก์ชันเดียว */
 export async function processArtwork(
   file: File,
-  s: CheckSettings,
   onUpdate: (u: { progress?: number; phase?: "uploading" | "checking"; previewUrl?: string }) => void,
 ) {
   const ext = fileExt(file.name);
   const isImage = ["jpg", "jpeg", "png"].includes(ext);
   const [preview, clientCheck] = await Promise.all([
     makePreview(file),
-    isImage ? checkImageInBrowser(file, s) : Promise.resolve(null),
+    isImage ? checkImageInBrowser(file) : Promise.resolve(null),
   ]);
   if (preview) onUpdate({ previewUrl: preview.dataUrl });
   const uploadId = await uploadFile(file, file.name, "artwork", (p) => onUpdate({ progress: p }));

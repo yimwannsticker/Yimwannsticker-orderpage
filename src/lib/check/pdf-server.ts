@@ -11,7 +11,7 @@ import {
   type PDFObject,
 } from "pdf-lib";
 import type { CheckIssue, CheckResult } from "../types";
-import { dpiIssue, finalize, type CheckSettings } from "./rules";
+import { finalize } from "./rules";
 
 type Matrix = [number, number, number, number, number, number];
 const IDENTITY: Matrix = [1, 0, 0, 1, 0, 0];
@@ -330,7 +330,7 @@ const NO_PDF_CONTENT = "without PDF Content";
 export const AI_RESAVE_HOWTO =
   "วิธีบันทึกใหม่: เปิดไฟล์ใน Illustrator > File > Save As > เลือก Adobe Illustrator (ai) > ติ๊ก \"Create PDF Compatible File\" และ \"Include Linked Files\" แล้วกด OK";
 
-export async function checkPdfLike(buf: Buffer, kind: "pdf" | "ai", s: CheckSettings): Promise<CheckResult> {
+export async function checkPdfLike(buf: Buffer, kind: "pdf" | "ai"): Promise<CheckResult> {
   const head = buf.subarray(0, 1024).toString("latin1");
   const issues: CheckIssue[] = [];
   const info: CheckResult["info"] = { kind };
@@ -422,32 +422,11 @@ export async function checkPdfLike(buf: Buffer, kind: "pdf" | "ai", s: CheckSett
     }
   }
 
-  // รูปภายใน ใช้ค่าต่ำสุด ข้ามรูปเล็กมาก (เช่นไอคอน < 5 มม.)
+  // รูปภายใน: เก็บค่าต่ำสุดที่ขนาดหน้าจริง ข้ามรูปเล็กมาก (เช่นไอคอน < 5 มม.)
+  // ความคมชัดจริงคำนวณอีกครั้งตามขนาดดวงที่ลูกค้าเลือก (applySize)
   const meaningful = result.images.filter((im) => im.placedWmm >= 5 && im.placedHmm >= 5);
-  if (meaningful.length) {
-    const worst = meaningful.reduce((a, b) => (b.dpi < a.dpi ? b : a));
-    info.minImageDpi = worst.dpi;
-    const d = dpiIssue(worst.dpi, s);
-    if (d) {
-      const count = meaningful.filter((im) => im.dpi < s.dpiGood).length;
-      d.message = `รูปภายในไฟล์ ${count} รูป ${d.level === "red" ? "ความละเอียดต่ำ" : "ความละเอียดค่อนข้างต่ำ"} (ต่ำสุดประมาณ ${worst.dpi} DPI ที่ขนาดจริง ${Math.round(worst.placedWmm)}×${Math.round(worst.placedHmm)} มม.)${d.level === "red" ? " งานส่วนนั้นจะแตกหรือเบลอ กรุณาใช้รูปต้นฉบับที่ใหญ่กว่านี้" : " พิมพ์ได้แต่อาจไม่คมมาก"}`;
-      issues.push(d);
-    }
-  }
+  if (meaningful.length) info.minImageDpi = meaningful.reduce((a, b) => (b.dpi < a.dpi ? b : a)).dpi;
 
-  // ขนาดหน้า
-  if (info.pageWidthMm && info.pageHeightMm) {
-    const W = Math.min(s.sheetWidthMm, s.sheetHeightMm);
-    const H = Math.max(s.sheetWidthMm, s.sheetHeightMm);
-    const pw = Math.min(info.pageWidthMm, info.pageHeightMm);
-    const ph = Math.max(info.pageWidthMm, info.pageHeightMm);
-    if (pw > W + 2 || ph > H + 2) {
-      issues.push({
-        level: "yellow",
-        message: `ขนาดงาน ${info.pageWidthMm}×${info.pageHeightMm} มม. ใหญ่กว่าแผ่น ${s.sheetName} (${W}×${H} มม.) ร้านจะย่อให้พอดีแผ่น ถ้าต้องการขนาดจริงกรุณาปรับไฟล์`,
-      });
-    }
-  }
   if (pages.length > 1) {
     issues.push({
       level: "yellow",
