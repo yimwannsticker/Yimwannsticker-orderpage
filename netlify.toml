@@ -4,3 +4,7 @@
 
 [build.environment]
   NODE_VERSION = "22"
+
+# ตัวแปลง Next.js ของ Netlify (ระบุไว้ชัดๆ ไม่ต้องรอ Netlify ตรวจจับเอง)
+[[plugins]]
+  package = "@netlify/plugin-nextjs"
