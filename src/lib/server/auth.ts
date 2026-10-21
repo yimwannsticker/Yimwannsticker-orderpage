@@ -18,14 +18,15 @@ export async function getStaff(): Promise<Staff | null> {
   } = await supa.auth.getUser();
   if (!user) return null;
   const { data } = await db().from("staff").select("role, email").eq("user_id", user.id).maybeSingle();
-  if (data) return { userId: user.id, email: data.email, role: data.role as Role };
-
-  // คนแรกที่ล็อกอินด้วยอีเมลใน ADMIN_EMAILS จะได้สิทธิ์แอดมินอัตโนมัติ
+  // อีเมลใน ADMIN_EMAILS เป็นแอดมินเสมอ (กันเผลอเปลี่ยนสิทธิ์เจ้าของร้านเป็นกราฟิก)
   const admins = (process.env.ADMIN_EMAILS ?? "")
     .split(",")
     .map((e) => e.trim().toLowerCase())
     .filter(Boolean);
-  if (user.email && admins.includes(user.email.toLowerCase())) {
+  const isOwner = Boolean(user.email && admins.includes(user.email.toLowerCase()));
+  if (data && (data.role === "admin" || !isOwner)) return { userId: user.id, email: data.email, role: data.role as Role };
+
+  if (user.email && isOwner) {
     await db().from("staff").upsert({ user_id: user.id, email: user.email, role: "admin" });
     return { userId: user.id, email: user.email, role: "admin" };
   }

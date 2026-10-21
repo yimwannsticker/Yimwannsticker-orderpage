@@ -275,6 +275,9 @@ export async function addStaff(email: string, role: Role, password: string): Pro
     userId = list?.users.find((u) => u.email?.toLowerCase() === e)?.id;
     if (!userId) return { ok: false, error: error.message };
   }
+  const { data: existing } = await db().from("staff").select("role").eq("user_id", userId).maybeSingle();
+  if (existing)
+    return { ok: false, error: `อีเมลนี้เป็นพนักงานอยู่แล้ว (${existing.role === "admin" ? "แอดมิน" : "กราฟิก"}) ถ้าจะเปลี่ยนสิทธิ์ให้เปลี่ยนในรายการด้านบน` };
   const { error: e2 } = await db().from("staff").upsert({ user_id: userId, email: e, role });
   if (e2) return { ok: false, error: e2.message };
   revalidatePath("/admin/staff");
