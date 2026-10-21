@@ -61,6 +61,8 @@
 
 ## ติดตั้ง
 
+คู่มือแบบละเอียดทีละขั้นตอน (มีวิธีแก้ปัญหา): [docs/SETUP.md](docs/SETUP.md)
+
 ### 1. Supabase (ฐานข้อมูล)
 1. สร้างโปรเจกต์ที่ [supabase.com](https://supabase.com) (แพ็กเกจฟรี) เลือก region Singapore
 2. เปิด SQL Editor แล้วรันไฟล์ใน `supabase/migrations/` ทีละไฟล์ตามลำดับเลข (`0001_init.sql` ถึง `0005_heartbeat.sql`)
