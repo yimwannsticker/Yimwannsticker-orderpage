@@ -1,12 +1,13 @@
 import "server-only";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import { supabaseUrl } from "./url";
 
 let client: SupabaseClient | null = null;
 
 /** client สิทธิ์เต็ม ใช้ฝั่ง server เท่านั้น */
 export function db() {
   if (!client) {
-    const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const url = supabaseUrl();
     const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
     if (!url || !key) throw new Error("ยังไม่ได้ตั้งค่า NEXT_PUBLIC_SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY");
     client = createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } });
