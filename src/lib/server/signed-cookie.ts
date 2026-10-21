@@ -34,3 +34,12 @@ export interface LineSession {
   name: string;
   picture?: string;
 }
+
+/** สิทธิ์ใช้ไฟล์เดิมหนึ่งไฟล์ (ออกให้หลังยืนยันชื่อ + เบอร์โทร) */
+export interface FileGrant {
+  /** order_items.id */
+  i: string;
+  /** เบอร์โทรเจ้าของ */
+  p: string;
+  exp: number;
+}

@@ -11,6 +11,7 @@ import { AddressForm, EMPTY_CUSTOMER, type CustomerForm } from "./AddressForm";
 import { Dropzone } from "./Dropzone";
 import { ItemCard, UploadRow } from "./ItemCards";
 import { LineLoginCard } from "./LineLoginCard";
+import { PastFilesPicker, type PastFile } from "./PastFilesPicker";
 import { PaymentInfo, SlipUploader } from "./PaymentBox";
 import { useArtworkUploader } from "./useArtworkUploader";
 
@@ -148,6 +149,35 @@ export function OrderWizard({ settings }: { settings: PublicSettings }) {
     [],
   );
   const remove = (key: string) => setItems((xs) => xs.filter((x) => x.key !== key));
+  const [picker, setPicker] = useState(false);
+  function addPastFiles(files: PastFile[], who: { name: string; phone: string }) {
+    setItems((xs) => [
+      ...xs,
+      ...files.map(
+        (f): DraftItem => ({
+          key: crypto.randomUUID(),
+          uploadId: null,
+          previewUploadId: null,
+          previewUrl: f.previewUrl,
+          fileName: f.fileName,
+          fileSize: f.fileSize,
+          fileType: f.fileType,
+          status: "done",
+          progress: 100,
+          check: f.check,
+          product: f.product,
+          finish: f.finish,
+          qty: Math.max(f.qty, settings.minPerFile),
+          acceptRisk: false,
+          fixService: false,
+          source: { grant: f.grant, itemId: f.itemId, orderNo: f.orderNo, prevApproved: f.prevApproved, prevFixed: f.prevFixed },
+        }),
+      ),
+    ]);
+    setCustomer((c) => ({ ...c, name: c.name || who.name, phone: c.phone || who.phone }));
+    setPicker(false);
+    setNotice(`เพิ่มไฟล์ที่เคยสั่ง ${files.length} ไฟล์แล้ว ใช้ประเภทและจำนวนจากครั้งล่าสุด แก้ได้ในขั้นถัดไป`);
+  }
   const addFiles = useArtworkUploader(settings, add, update);
   const onFiles = (files: FileList) => {
     setError(null);
@@ -244,7 +274,11 @@ export function OrderWizard({ settings }: { settings: PublicSettings }) {
             freeQty: i.freeQty,
             acceptRisk: i.acceptRisk,
             fixService: i.fixService,
-            reorder: i.source ? { token: i.source.token, itemId: i.source.itemId } : null,
+            reorder: i.source
+              ? i.source.grant
+                ? { grant: i.source.grant }
+                : { token: i.source.token, itemId: i.source.itemId }
+              : null,
           })),
           customer: { ...customer, phone },
           slipUploadId: slip.uploadId,
@@ -272,6 +306,17 @@ export function OrderWizard({ settings }: { settings: PublicSettings }) {
     }
   }
 
+  if (picker)
+    return (
+      <PastFilesPicker
+        initialName={customer.name}
+        initialPhone={customer.phone}
+        inCart={new Set(items.map((i) => i.source?.itemId).filter(Boolean) as string[])}
+        onAdd={addPastFiles}
+        onClose={() => setPicker(false)}
+      />
+    );
+
   if (done) return <DoneScreen orderNo={done.orderNo} token={done.token} contactLine={settings.contactLine} />;
 
   return (
@@ -298,12 +343,9 @@ export function OrderWizard({ settings }: { settings: PublicSettings }) {
         <section className="space-y-3">
           <h1 className="text-xl font-bold">อัปโหลดไฟล์งาน</h1>
           <Dropzone onFiles={onFiles} maxMb={settings.maxFileMb} />
-          <p className="text-center text-sm text-muted">
-            เคยสั่งแล้ว อยากได้แบบเดิม?{" "}
-            <Link href="/track?reorder=1" className="font-semibold text-brand-600 underline">
-              สั่งซ้ำจากออเดอร์เก่า
-            </Link>
-          </p>
+          <button type="button" className="btn-secondary w-full" onClick={() => setPicker(true)}>
+            ↻ เลือกจากไฟล์ที่เคยสั่ง
+          </button>
           {items.map((it) => (
             <UploadRow key={it.key} item={it} onRemove={() => remove(it.key)} />
           ))}
@@ -324,7 +366,12 @@ export function OrderWizard({ settings }: { settings: PublicSettings }) {
               onRemove={() => remove(it.key)}
             />
           ))}
-          <Dropzone compact onFiles={onFiles} maxMb={settings.maxFileMb} />
+          <div className="grid grid-cols-2 gap-2">
+            <Dropzone compact onFiles={onFiles} maxMb={settings.maxFileMb} />
+            <button type="button" className="btn-secondary w-full" onClick={() => setPicker(true)}>
+              ↻ ไฟล์ที่เคยสั่ง
+            </button>
+          </div>
           <PriceTable settings={settings} total={quote.totalSheets} />
         </section>
       )}

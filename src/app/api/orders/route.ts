@@ -8,7 +8,7 @@ import { notifyShop, siteUrl } from "@/lib/server/email";
 import { bad, readJson } from "@/lib/server/http";
 import { getOrCreateCustomer, getPoints } from "@/lib/server/orders";
 import { getSettings } from "@/lib/server/settings";
-import { LINE_COOKIE, verify, type LineSession } from "@/lib/server/signed-cookie";
+import { LINE_COOKIE, verify, type FileGrant, type LineSession } from "@/lib/server/signed-cookie";
 import { verifySlip } from "@/lib/server/slip";
 import { db } from "@/lib/supabase/admin";
 import type { Address, CheckResult, Finish, ProductKey } from "@/lib/types";
@@ -25,8 +25,11 @@ interface Body {
     freeQty: number;
     acceptRisk: boolean;
     fixService: boolean;
-    /** สั่งซ้ำ: ใช้ไฟล์จากรายการในออเดอร์เดิม (ยืนยันด้วย token ของออเดอร์นั้น) */
-    reorder?: { token: string; itemId: string } | null;
+    /**
+     * สั่งซ้ำ: ใช้ไฟล์จากรายการในออเดอร์เดิม ยืนยันด้วย token ของออเดอร์นั้น
+     * หรือ grant ที่ได้จากหน้า "ไฟล์ที่เคยสั่ง" (ยืนยันชื่อ + เบอร์แล้ว)
+     */
+    reorder?: ReorderRef | null;
   }[];
   customer: { name: string; phone: string; address: Address; note?: string };
   slipUploadId: string;
@@ -67,14 +70,14 @@ export async function POST(req: Request) {
   const slip = byId.get(body.slipUploadId);
   if (!slip || slip.kind !== "slip" || slip.used) return bad("กรุณาอัปโหลดสลิปการโอนเงิน");
 
-  const reorderItems = await loadReorderItems(body.items.map((i) => i.reorder).filter(Boolean) as { token: string; itemId: string }[]);
+  const reorderItems = await loadReorderItems(body.items.map((i) => i.reorder ?? null));
 
-  const missing = body.items.findIndex((i) => i.reorder && !reorderItems.has(String(i.reorder.itemId)));
+  const missing = body.items.findIndex((i, idx) => i.reorder && !reorderItems[idx]);
   if (missing >= 0)
     return bad(`ไฟล์เดิมของไฟล์ที่ ${missing + 1} ถูกลบออกจากระบบแล้ว กรุณาลบรายการนี้แล้วอัปโหลดไฟล์ใหม่`);
 
-  const items = body.items.map((it) => {
-    const src = it.reorder ? reorderItems.get(it.reorder.itemId) : undefined;
+  const items = body.items.map((it, idx) => {
+    const src = reorderItems[idx];
     const up = src ? src.up : byId.get(it.uploadId);
     const pv = src ? src.preview : it.previewUploadId ? byId.get(it.previewUploadId) : null;
     const product: ProductKey = it.product === "pp" ? "pp" : "paper";
@@ -216,26 +219,40 @@ export async function POST(req: Request) {
 
 type UploadLike = { path: string; file_name: string; size: number; kind: string; used: boolean; check_result: unknown };
 
-/** หาไฟล์ของรายการในออเดอร์เดิมสำหรับสั่งซ้ำ */
-async function loadReorderItems(refs: { token: string; itemId: string }[]) {
-  const out = new Map<string, { itemId: string; up: UploadLike; preview: { path: string } | null; prevApproved: boolean }>();
-  if (!refs.length) return out;
-  const tokens = [...new Set(refs.map((r) => String(r.token)))];
-  const { data: orders } = await db().from("orders").select("id, token").in("token", tokens);
-  const orderIds = new Map((orders ?? []).map((o) => [o.token as string, o.id as string]));
+type ReorderRef = { token?: string; itemId?: string; grant?: string };
+
+/** หาไฟล์ของรายการในออเดอร์เดิมสำหรับสั่งซ้ำ (คืนค่าเรียงตามลำดับรายการ) */
+async function loadReorderItems(refs: (ReorderRef | null)[]) {
+  type Found = { itemId: string; up: UploadLike; preview: { path: string; kind: "preview" } | null; prevApproved: boolean };
+  // แปลงแต่ละ ref เป็น itemId + เงื่อนไขที่ต้องตรง
+  const wanted = refs.map((r) => {
+    if (!r) return null;
+    if (r.grant) {
+      const g = verify<FileGrant>(String(r.grant));
+      return g && g.exp > Date.now() ? { itemId: g.i, phone: g.p } : null;
+    }
+    return r.token && r.itemId ? { itemId: String(r.itemId), token: String(r.token) } : null;
+  });
+  const ids = [...new Set(wanted.filter(Boolean).map((w) => w!.itemId))];
+  const out: (Found | null)[] = refs.map(() => null);
+  if (!ids.length) return out;
   const { data: rows } = await db()
     .from("order_items")
-    .select("id, order_id, file_path, file_name, file_size, preview_path, check_result, accept_risk, fix_service")
-    .in("id", refs.map((r) => String(r.itemId)));
-  for (const r of refs) {
-    const row = rows?.find((x) => x.id === r.itemId && x.order_id === orderIds.get(r.token));
-    if (!row?.file_path) continue;
-    out.set(r.itemId, {
+    .select("id, file_path, file_name, file_size, preview_path, check_result, accept_risk, fix_service, orders(token, customer_phone)")
+    .in("id", ids);
+  wanted.forEach((w, idx) => {
+    if (!w) return;
+    const row = rows?.find((x) => x.id === w.itemId);
+    const o = row?.orders as unknown as { token: string; customer_phone: string } | null;
+    if (!row?.file_path || !o) return;
+    if ("token" in w && w.token !== o.token) return;
+    if ("phone" in w && w.phone !== o.customer_phone) return;
+    out[idx] = {
       itemId: row.id,
       up: { path: row.file_path, file_name: row.file_name, size: row.file_size, kind: "artwork", used: false, check_result: row.check_result },
-      preview: row.preview_path ? { path: row.preview_path } : null,
+      preview: row.preview_path ? { path: row.preview_path, kind: "preview" } : null,
       prevApproved: Boolean(row.fix_service || row.accept_risk),
-    });
-  }
+    };
+  });
   return out;
 }

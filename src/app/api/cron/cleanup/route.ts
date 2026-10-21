@@ -51,5 +51,7 @@ export async function GET(req: Request) {
   // ประวัติการอัปโหลดที่ใช้แล้วเก็บไว้ไม่จำเป็น
   await db().from("uploads").delete().eq("used", true).lt("created_at", cutoff);
 
+  await db().from("lookup_attempts").delete().lt("created_at", new Date(Date.now() - 86400_000).toISOString());
+
   return NextResponse.json({ removedOrders, removedUploads: stale?.length ?? 0 });
 }

@@ -99,5 +99,14 @@ export interface DraftItem {
   acceptRisk: boolean;
   fixService: boolean;
   /** สั่งซ้ำ: ใช้ไฟล์จากออเดอร์เดิม ไม่ต้องอัปโหลดใหม่ */
-  source?: { token: string; itemId: string; orderNo: string; prevApproved: boolean; prevFixed: boolean } | null;
+  source?: {
+    /** มาจากปุ่มสั่งซ้ำในหน้าเช็คสถานะ */
+    token?: string;
+    /** มาจาก "ไฟล์ที่เคยสั่ง" (ยืนยันชื่อ + เบอร์แล้ว) */
+    grant?: string;
+    itemId: string;
+    orderNo: string;
+    prevApproved: boolean;
+    prevFixed: boolean;
+  } | null;
 }
