@@ -56,6 +56,30 @@ export async function checkImageInBrowser(file: File): Promise<CheckResult> {
   return rasterCheck(h.width, h.height, h.colorMode, "browser", fileExt(file.name), h.hasAlpha);
 }
 
+/** ตรวจไฟล์ทุกชนิดใน browser (PDF/AI/PSD โหลดตัวตรวจเมื่อจำเป็น) */
+export async function checkFileInBrowser(file: File): Promise<CheckResult> {
+  const ext = fileExt(file.name);
+  if (["jpg", "jpeg", "png"].includes(ext)) return checkImageInBrowser(file);
+  try {
+    const bytes = new Uint8Array(await file.arrayBuffer());
+    if (ext === "psd") {
+      const { checkPsd } = await import("../check/psd-check");
+      return checkPsd(bytes, "browser");
+    }
+    const { checkPdfLike } = await import("../check/pdf-check");
+    return await checkPdfLike(bytes, ext === "ai" ? "ai" : "pdf", "browser");
+  } catch (e) {
+    console.warn("check failed", e);
+    return {
+      level: "yellow",
+      title: "รอกราฟิกตรวจ",
+      issues: [{ level: "yellow", message: "ระบบตรวจไฟล์นี้อัตโนมัติไม่ได้ (ไฟล์อาจใหญ่เกินไปสำหรับเครื่องนี้) กราฟิกจะตรวจให้ภายหลัง" }],
+      info: { kind: ext, needsManualReview: true },
+      checkedBy: "browser",
+    };
+  }
+}
+
 const PREVIEW_MAX = 720;
 
 function canvasToOutputs(canvas: HTMLCanvasElement) {
@@ -169,8 +193,6 @@ export async function uploadFile(
   await new Promise<void>((resolve, reject) => {
     const xhr = new XMLHttpRequest();
     xhr.open("PUT", json.signedUrl);
-    xhr.setRequestHeader("x-upsert", "false");
-    xhr.setRequestHeader("cache-control", "max-age=3600");
     xhr.setRequestHeader("content-type", file.type || "application/octet-stream");
     xhr.upload.onprogress = (e) => {
       if (e.lengthComputable) onProgress?.(Math.round((e.loaded / e.total) * 100));
@@ -203,10 +225,10 @@ export async function processArtwork(
 ) {
   const ext = fileExt(file.name);
   const isImage = ["jpg", "jpeg", "png"].includes(ext);
-  const [preview, clientCheck] = await Promise.all([
-    makePreview(file),
-    isImage ? checkImageInBrowser(file) : Promise.resolve(null),
-  ]);
+  // ไฟล์ PDF/AI/PSD ใช้หน่วยความจำเยอะ ทำทีละอย่างเพื่อไม่ให้มือถือค้าง
+  const [preview, clientCheck] = isImage
+    ? await Promise.all([makePreview(file), checkImageInBrowser(file)])
+    : [await makePreview(file), await checkFileInBrowser(file)];
   if (preview) onUpdate({ previewUrl: preview.dataUrl });
   const uploadId = await uploadFile(file, file.name, "artwork", (p) => onUpdate({ progress: p }));
   const previewUploadId = preview ? await uploadFile(preview.blob, "preview.jpg", "preview").catch(() => null) : null;

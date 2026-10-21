@@ -2,8 +2,8 @@
 
 เว็บให้ลูกค้าสั่งพิมพ์สติกเกอร์ A3+ จบเองได้ ไม่ต้องคุยกับแอดมิน: อัปโหลดไฟล์ → ระบบตรวจไฟล์ → เลือกสติกเกอร์ → กรอกที่อยู่ → สแกน QR พร้อมเพย์ + แนบสลิป → ได้เลขออเดอร์และลิงก์เช็คสถานะ
 
-- **Next.js 16** (App Router) + **Supabase** (Postgres, Auth, Storage) — ใช้แพ็กเกจฟรีได้ทั้งคู่ (ดูข้อจำกัดขนาดไฟล์ด้านล่าง)
-- Deploy บน **Vercel** (ฟรี) มี Cron ลบไฟล์อัตโนมัติวันละครั้ง
+- **Next.js 16** (App Router) + **Supabase** (Postgres, Auth) + **Cloudflare R2** (เก็บไฟล์)
+- Deploy บน **Netlify** แพ็กเกจฟรี (ย้ายไป Vercel ได้) — ทุกส่วนใช้แพ็กเกจฟรีได้ ดู "ค่าใช้จ่าย" ด้านล่าง
 
 ## ฟีเจอร์
 
@@ -11,7 +11,7 @@
 1. อัปโหลดไฟล์ JPG/PNG/PDF/AI/PSD (ลากวาง/เลือกได้หลายไฟล์ 1 ไฟล์ = 1 รายการ) ตรวจไฟล์ทันที ขึ้นป้ายเขียว/เหลือง/แดง พร้อมคำอธิบายและรูปตัวอย่าง
    - JPG/PNG ตรวจใน browser (อ่านขนาดพิกเซลจาก header ไม่ใช้ DPI ใน metadata)
    - **ความคมชัดคิดตามขนาดดวงที่ลูกค้าเลือก** (เช่นไฟล์ 600×600 px ที่ดวง 2 ซม. = 762 DPI ผ่าน แต่ที่ 15 ซม. = 102 DPI ไม่ผ่าน) ขั้นอัปโหลดบอกว่าไฟล์พิมพ์คมชัดได้ถึงขนาดเท่าไร
-   - PDF/AI/PSD ตรวจฝั่ง server: ฟอนต์ embed/outline, รูปภายใน (คำนวณ DPI จากขนาดที่วางจริงในหน้า), ขนาดหน้า, รูปที่ link ไว้ใน AI (อ่านจาก XMP), AI ที่ไม่ได้ save แบบ PDF Compatible → "รอกราฟิกตรวจ", PSD อ่านด้วย ag-psd
+   - PDF/AI/PSD ตรวจใน browser เช่นกัน: ฟอนต์ embed/outline, รูปภายใน (คำนวณ DPI จากขนาดที่วางจริงในหน้า), ขนาดหน้า, รูปที่ link ไว้ใน AI (อ่านจาก XMP), AI ที่ไม่ได้ save แบบ PDF Compatible → "รอกราฟิกตรวจ", PSD อ่านด้วย ag-psd
    - ไฟล์แดงต้องติ๊ก "ยอมรับว่าไฟล์อาจพิมพ์ไม่คมชัด" หรือเลือก "ให้ร้านช่วยแก้ไฟล์" (มีค่าบริการ)
 2. การ์ดต่อไฟล์: **ทรงไดคัท** (สี่เหลี่ยม / วงกลม / ไดคัทตามทรง) + **ขนาดต่อดวงเป็น ซม.** (ล็อกสัดส่วนตามไฟล์ได้, วงกลมใส่เส้นผ่านศูนย์กลาง) แสดงจำนวนดวงต่อแผ่นโดยประมาณ และช่อง "ต้องการกี่ดวง?" คำนวณจำนวนแผ่นให้ · วงกลมกับไฟล์ไม่จัตุรัส และไดคัทตามทรงกับไฟล์พื้นหลังทึบจะขึ้นคำเตือน · ประเภท (กระดาษขาวเงา / PP ขาวด้าน·ขาวเงา·ใส), จำนวน (ขั้นต่ำ 5), ปุ่ม + เพิ่มไฟล์, แถบล่างแสดงยอดรวม + ข้อความ "สั่งเพิ่มอีก X แผ่น…"
 3. ที่อยู่: ช่องวางที่อยู่ทั้งก้อนแล้วแยกช่องให้, รหัสไปรษณีย์เติมตำบล/อำเภอ/จังหวัด, ปุ่ม LINE Login (ไม่บังคับ)
@@ -44,40 +44,78 @@
 - ลูกค้าพิมพ์เลขออเดอร์ (เช่น YW1001) ใน LINE OA บอทตอบสถานะด้วย reply message (ไม่เสียโควตา) รายละเอียด/เลขพัสดุแสดงเฉพาะ LINE เดียวกับที่สั่ง หรือพิมพ์เบอร์โทรมาด้วย
 - ร้าน: ป้าย "ใหม่" ในหลังบ้าน + อีเมลผ่าน SMTP (Gmail + App Password ฟรี)
 
+## ค่าใช้จ่าย
+
+ตั้งค่าแบบนี้ใช้แพ็กเกจฟรีทั้งหมด (ประมาณ 0 บาท/เดือน)
+
+| ส่วน | บริการ | แพ็กเกจฟรี |
+|---|---|---|
+| ตัวเว็บ | Netlify | ใช้ทำธุรกิจได้ · 100 GB/เดือน · ระบบหลังบ้านทำงานได้ครั้งละ 10 วินาที |
+| ไฟล์งาน/สลิป | Cloudflare R2 | เก็บฟรี 10 GB ดาวน์โหลดฟรีไม่จำกัด (เกินคิด ~$0.015/GB/เดือน) |
+| ฐานข้อมูล + ล็อกอินหลังบ้าน | Supabase | 500 MB · ไม่มีสำรองอัตโนมัติ (ใช้ปุ่มสำรองข้อมูลในหน้าตั้งค่า) |
+| แจ้งเลขพัสดุ / บอท | LINE OA | push ฟรีตามโควตารายเดือน, reply ฟรี |
+| อีเมลแจ้งร้าน | Gmail SMTP | ฟรี |
+
+ไฟล์ PDF/AI/PSD ตรวจใน browser ของลูกค้า (เพราะโฮสต์ฟรีจำกัดเวลาประมวลผล) ระบบหลังบ้านไม่ต้องดาวน์โหลดไฟล์ใหญ่เลย
+ถ้าภายหลังอยากย้ายไป Vercel Pro ใช้โค้ดชุดเดิมได้ (มี `vercel.json` ตั้ง Cron ไว้แล้ว) ส่วน Supabase อัปเป็น Pro ได้ทุกเมื่อเพื่อให้มีสำรองข้อมูลอัตโนมัติ
+
 ## ติดตั้ง
 
-### 1. Supabase
-1. สร้างโปรเจกต์ที่ [supabase.com](https://supabase.com)
-2. เปิด SQL Editor แล้วรันไฟล์ใน `supabase/migrations/` ทีละไฟล์ตามลำดับเลข (`0001_init.sql` ถึง `0004_sticker_size.sql`) หรือ `npx supabase link` + `npx supabase db push`
-   ไฟล์นี้สร้างตาราง, เปิด RLS ทุกตาราง (anon key อ่าน/เขียนตรงไม่ได้ แอปเข้าถึงผ่าน server เท่านั้น) และสร้าง bucket `order-files` แบบ private
+### 1. Supabase (ฐานข้อมูล)
+1. สร้างโปรเจกต์ที่ [supabase.com](https://supabase.com) (แพ็กเกจฟรี) เลือก region Singapore
+2. เปิด SQL Editor แล้วรันไฟล์ใน `supabase/migrations/` ทีละไฟล์ตามลำดับเลข (`0001_init.sql` ถึง `0005_heartbeat.sql`)
 3. Authentication → URL Configuration: ตั้ง Site URL เป็นโดเมนเว็บ และเพิ่ม `https://<โดเมน>/admin/auth/callback` ใน Redirect URLs
-4. Authentication → Users → Add user: สร้างบัญชีอีเมล+รหัสผ่านของเจ้าของร้าน (อีเมลที่อยู่ใน `ADMIN_EMAILS` จะได้สิทธิ์แอดมินอัตโนมัติเมื่อล็อกอินครั้งแรก) พนักงานคนอื่นเพิ่มได้จากหน้า "พนักงาน"
+4. Authentication → Users → Add user: สร้างบัญชีอีเมล+รหัสผ่านของเจ้าของร้าน (อีเมลที่อยู่ใน `ADMIN_EMAILS` จะได้สิทธิ์แอดมินอัตโนมัติเมื่อล็อกอินครั้งแรก)
+5. Project Settings → API: คัดลอก Project URL, anon key, service_role key
 
-> **ขนาดไฟล์**: Supabase แพ็กเกจฟรีจำกัดไฟล์ละ **50MB** ถ้าต้องการรับ 200MB ต้องใช้แพ็กเกจ Pro แล้วตั้ง Storage → Settings → Upload file size limit เป็น 200MB และตั้ง "ขนาดไฟล์สูงสุด" ในหน้าตั้งค่าหลังบ้านให้ตรงกัน (ถ้าใช้ฟรีให้ตั้งเป็น 50)
+แพ็กเกจฟรีจะพักโปรเจกต์ถ้าไม่มีการใช้งาน 7 วัน งานตั้งเวลาของเว็บเขียนข้อมูลลงตาราง `app_heartbeat` ทุกชั่วโมงเพื่อกันไว้แล้ว
 
-### 2. Vercel
-1. Import repo นี้ใน Vercel
-2. ใส่ Environment Variables ตาม `.env.example` (อย่างน้อย Supabase 3 ตัว, `NEXT_PUBLIC_SITE_URL`, `APP_SECRET`, `ADMIN_EMAILS`, `CRON_SECRET`)
-3. Deploy — Cron ใน `vercel.json` จะเรียก `/api/cron/cleanup` ทุกวัน (03:00 เวลาไทย) ลบไฟล์ของออเดอร์ที่ส่งแล้วเกิน 365 วัน (ตั้งได้) และไฟล์ที่อัปโหลดทิ้งไว้แต่ไม่ได้สั่งเกิน 3 วัน
+### 2. Cloudflare R2 (เก็บไฟล์)
+1. สมัคร [Cloudflare](https://dash.cloudflare.com) → R2 Object Storage → เปิดใช้ (ต้องผูกบัตร แต่ไม่คิดเงินถ้าอยู่ในโควตาฟรี)
+2. Create bucket ชื่อ `yimwann-files` (ไม่ต้องเปิด public)
+3. ในหน้า bucket → Settings → CORS Policy ใส่ (เปลี่ยนโดเมนเป็นของร้าน):
+   ```json
+   [
+     {
+       "AllowedOrigins": ["https://<โดเมนเว็บ>"],
+       "AllowedMethods": ["PUT", "GET", "HEAD"],
+       "AllowedHeaders": ["content-type"],
+       "MaxAgeSeconds": 3600
+     }
+   ]
+   ```
+4. R2 → Manage API Tokens → Create API token สิทธิ์ **Object Read & Write** เฉพาะ bucket นี้ → คัดลอก Access Key ID, Secret Access Key และ Account ID
+
+### 3. Netlify (ตัวเว็บ)
+1. สมัคร [Netlify](https://app.netlify.com) ด้วยบัญชี GitHub → Add new site → Import จาก repo นี้ (ตั้งค่า build อยู่ใน `netlify.toml` แล้ว)
+2. Site configuration → Environment variables: ใส่ค่าตาม `.env.example` อย่างน้อย
+   Supabase 3 ตัว, R2 4 ตัว, `NEXT_PUBLIC_SITE_URL`, `APP_SECRET`, `ADMIN_EMAILS`, `CRON_SECRET`
+3. Deploy แล้วเช็คว่า Functions มี `scheduled-cleanup` (ทำงานทุกชั่วโมง: ลบไฟล์หมดอายุ + กันฐานข้อมูลถูกพัก)
 4. ล็อกอิน `/admin` → ตั้งค่า → ใส่เลขพร้อมเพย์/บัญชี และตรวจตารางราคา
+5. ทดลองสั่งเองให้ครบทุกขั้น ทั้งไฟล์ JPG, PNG, PDF, AI ก่อนส่งลิงก์ให้ลูกค้า
 
-### 3. LINE (ทำทีหลังได้)
+> Next.js 16 บน Netlify ใช้ตัวแปลงของ Netlify ถ้าเจอปัญหาตอน deploy (เช่น ล็อกอินหลังบ้านหลุดบ่อย) ย้ายไป Vercel ได้ด้วยโค้ดชุดเดิม
+
+### 4. LINE (ทำทีหลังได้)
 1. [LINE Developers](https://developers.line.biz): สร้าง **LINE Login channel** ใน Provider เดียวกับ LINE OA ของร้าน
    - Callback URL: `https://<โดเมน>/api/line/callback`
    - หัวข้อ "Linked LINE Official Account" เลือก OA ของร้าน (จำเป็นสำหรับ `bot_prompt=aggressive` ที่ชวนลูกค้าแอดเพื่อน)
    - ใส่ `LINE_LOGIN_CHANNEL_ID`, `LINE_LOGIN_CHANNEL_SECRET`
 2. **Messaging API channel** ของ OA: ใส่ `LINE_CHANNEL_SECRET`, `LINE_CHANNEL_ACCESS_TOKEN`
    - Webhook URL: `https://<โดเมน>/api/line/webhook` เปิด Use webhook
-   - ใน LINE OA Manager ปิด "ข้อความตอบกลับอัตโนมัติ" ที่ซ้ำกับบอท ถ้าต้องการ (ข้อความที่ไม่ใช่เลขออเดอร์ บอทจะไม่ตอบ ปล่อยให้แอดมินตอบเอง)
 
-### 4. ตรวจสลิปอัตโนมัติ (ไม่บังคับ ปิดไว้ก่อน)
-ใส่ API key ของ SlipOK (`SLIPOK_BRANCH_ID`, `SLIPOK_API_KEY`) หรือ EasySlip (`EASYSLIP_API_KEY`) แล้วเปิดในหน้าตั้งค่า ถ้าสลิปผ่านและยอดตรง ออเดอร์จะเปลี่ยนเป็น "ชำระแล้ว" ทันที — **ควรทดสอบกับบัญชีจริงก่อนเปิดใช้** เพราะรูปแบบ API อ้างอิงจากเอกสารของผู้ให้บริการ
+### 5. ตรวจสลิปอัตโนมัติ (ไม่บังคับ ปิดไว้ก่อน)
+ใส่ API key ของ SlipOK (`SLIPOK_BRANCH_ID`, `SLIPOK_API_KEY`) หรือ EasySlip (`EASYSLIP_API_KEY`) แล้วเปิดในหน้าตั้งค่า — **ควรทดสอบกับบัญชีจริงก่อนเปิดใช้**
+
+### สำรองข้อมูล
+หน้าตั้งค่า → "สำรองข้อมูล" ดาวน์โหลดข้อมูลทั้งหมด (JSON) และรายการออเดอร์ (Excel/CSV) แนะนำสัปดาห์ละครั้ง
 
 ## พัฒนาในเครื่อง
 
 ```bash
 npm install
 npx supabase start          # ต้องมี Docker (หรือใช้โปรเจกต์ Supabase จริงก็ได้)
+# ที่เก็บไฟล์: ใช้ bucket R2 จริง หรือ S3 จำลอง (ตั้ง S3_ENDPOINT เช่น MinIO / moto_server)
 cp .env.example .env.local  # ใส่ค่าที่ได้จาก supabase start
 npm run dev
 ```
@@ -89,8 +127,9 @@ npm run dev
 ```
 supabase/migrations/0001_init.sql   ตาราง + RLS + bucket
 src/lib/pricing.ts                  คำนวณราคา ขั้นราคา ค่าส่ง ข้อความกระตุ้น โปรสะสม
-src/lib/check/                      กฎตรวจไฟล์ (rules) + ตัวตรวจ PDF/AI และ PSD ฝั่ง server
-src/lib/client/file-tools.ts        ตรวจ JPG/PNG + สร้างรูปตัวอย่าง + อัปโหลดตรงเข้า Storage
+src/lib/check/                      กฎตรวจไฟล์ (rules) + ตัวตรวจ PDF/AI และ PSD
+src/lib/client/file-tools.ts        ตรวจไฟล์ใน browser + สร้างรูปตัวอย่าง + อัปโหลดตรงเข้า R2
+src/lib/server/storage.ts           เชื่อม Cloudflare R2 (S3 API)
 src/lib/address-parse.ts            แยกที่อยู่ทั้งก้อน · src/data/th-zip.json ข้อมูลรหัสไปรษณีย์
 src/components/order/               หน้าสั่งพิมพ์ 4 ขั้นตอน
 src/app/o/[token]/                  หน้าเช็คสถานะ
@@ -99,7 +138,7 @@ src/app/api/                        API: อัปโหลด, ตรวจไ�
 ```
 
 หมายเหตุ
-- ไฟล์อัปโหลดตรงจาก browser เข้า Supabase Storage ด้วย signed URL (ไม่ผ่าน Vercel ซึ่งรับ request ได้ไม่เกิน 4.5MB)
-- ตรวจ PDF/AI/PSD ฝั่ง server ต้องดาวน์โหลดไฟล์มาทั้งไฟล์ ไฟล์ใหญ่มากอาจใช้เวลานาน ตั้ง `maxDuration = 60` วินาทีไว้
+- ไฟล์อัปโหลดตรงจาก browser เข้า R2 ด้วยลิงก์ที่เซ็นแล้ว (ไม่ผ่านตัวเว็บ จึงรับไฟล์ใหญ่ได้)
+- ตรวจไฟล์ทุกชนิดใน browser (`src/lib/check/pdf-check.ts`, `psd-check.ts` ใช้ได้ทั้ง browser และ server) ไฟล์ AI/PSD ใหญ่มากบนมือถือรุ่นเก่าอาจตรวจไม่ไหว ระบบจะขึ้น "รอกราฟิกตรวจ" แทน
 - ลิงก์ติดตามพัสดุของแต่ละขนส่งอยู่ใน `src/lib/constants.ts` (`CARRIERS`) ถ้าขนส่งเปลี่ยนรูปแบบลิงก์ แก้ที่นี่
 - ข้อมูลรหัสไปรษณีย์จาก [thai-address-database](https://github.com/Sellsuki/thai-address-database) (ISC)

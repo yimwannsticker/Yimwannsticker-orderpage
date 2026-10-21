@@ -1,7 +1,7 @@
 import crypto from "node:crypto";
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
-import { STORAGE_BUCKET, productLabel, shapeLabel } from "@/lib/constants";
+import { productLabel, shapeLabel } from "@/lib/constants";
 import { applySize, perSheet, sizeText } from "@/lib/sticker-size";
 import { baht, formatAddress, isValidPhone, normalizePhone } from "@/lib/format";
 import { computeQuote, validateItems } from "@/lib/pricing";
@@ -11,6 +11,7 @@ import { getOrCreateCustomer, getPoints } from "@/lib/server/orders";
 import { getSettings } from "@/lib/server/settings";
 import { LINE_COOKIE, verify, type FileGrant, type LineSession } from "@/lib/server/signed-cookie";
 import { verifySlip } from "@/lib/server/slip";
+import * as storage from "@/lib/server/storage";
 import { db } from "@/lib/supabase/admin";
 import type { Address, CheckResult, Finish, ProductKey, Shape } from "@/lib/types";
 
@@ -115,10 +116,9 @@ export async function POST(req: Request) {
     return bad("มีไฟล์ที่อัปโหลดไม่สำเร็จ กรุณาลบแล้วอัปโหลดใหม่");
 
   // ตรวจว่าไฟล์อัปโหลดเสร็จจริง
-  const bucket = db().storage.from(STORAGE_BUCKET);
-  const exists = await Promise.all([slip.path, ...items.map((i) => i.up!.path)].map((p) => bucket.exists(p)));
-  if (!exists[0].data) return bad("อัปโหลดสลิปยังไม่เสร็จ กรุณาอัปโหลดใหม่");
-  if (exists.slice(1).some((e) => !e.data)) return bad("มีไฟล์ที่อัปโหลดไม่สำเร็จ กรุณาลบแล้วอัปโหลดใหม่");
+  const exists = await Promise.all([slip.path, ...items.map((i) => i.up!.path)].map((p) => storage.exists(p)));
+  if (!exists[0]) return bad("อัปโหลดสลิปยังไม่เสร็จ กรุณาอัปโหลดใหม่");
+  if (exists.slice(1).some((e) => !e)) return bad("มีไฟล์ที่อัปโหลดไม่สำเร็จ กรุณาลบแล้วอัปโหลดใหม่");
 
   const { points, pending } = await getPoints(phone);
   const quote = computeQuote(settings, items, points + pending);
@@ -209,7 +209,7 @@ export async function POST(req: Request) {
 
   // ตรวจสลิปอัตโนมัติ (ถ้าเปิดไว้)
   if (settings.slipVerify.enabled) {
-    const { data: slipBlob } = await db().storage.from(STORAGE_BUCKET).download(slip.path);
+    const slipBlob = await storage.download(slip.path);
     const res = slipBlob ? await verifySlip(settings, slipBlob, quote.total) : null;
     if (res) {
       await db()

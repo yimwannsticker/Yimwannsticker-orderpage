@@ -1,8 +1,9 @@
 import crypto from "node:crypto";
 import { NextResponse } from "next/server";
-import { ACCEPTED_EXT, STORAGE_BUCKET, fileExt } from "@/lib/constants";
+import { ACCEPTED_EXT, fileExt } from "@/lib/constants";
 import { bad, readJson } from "@/lib/server/http";
 import { getSettings } from "@/lib/server/settings";
+import * as storage from "@/lib/server/storage";
 import { db } from "@/lib/supabase/admin";
 
 type Kind = "artwork" | "preview" | "slip";
@@ -27,8 +28,7 @@ export async function POST(req: Request) {
   const month = new Date().toISOString().slice(0, 7);
   // ชื่อไฟล์ใน storage ใช้ตัวอักษรอังกฤษเท่านั้น ชื่อจริงเก็บในฐานข้อมูล
   const path = `${body.kind}/${month}/${crypto.randomUUID()}/file.${ext}`;
-  const { data, error } = await db().storage.from(STORAGE_BUCKET).createSignedUploadUrl(path);
-  if (error || !data) return bad("เตรียมอัปโหลดไม่สำเร็จ กรุณาลองใหม่", 500);
+  const signedUrl = await storage.uploadUrl(path);
 
   const { data: row, error: insErr } = await db()
     .from("uploads")
@@ -37,5 +37,5 @@ export async function POST(req: Request) {
     .single();
   if (insErr || !row) return bad("เตรียมอัปโหลดไม่สำเร็จ กรุณาลองใหม่", 500);
 
-  return NextResponse.json({ uploadId: row.id, signedUrl: data.signedUrl });
+  return NextResponse.json({ uploadId: row.id, signedUrl });
 }

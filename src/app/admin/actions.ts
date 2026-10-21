@@ -2,11 +2,12 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { CARRIERS, STORAGE_BUCKET, resolveCarrier } from "@/lib/constants";
+import { CARRIERS, resolveCarrier } from "@/lib/constants";
+import * as storage from "@/lib/server/storage";
 import { normalizePhone } from "@/lib/format";
 import { requireStaff, type Role } from "@/lib/server/auth";
 import { mergeSettings, saveSettings } from "@/lib/server/settings";
-import { markShipped, removeIfUnreferenced, signedUrls } from "@/lib/server/orders";
+import { markShipped, removeIfUnreferenced } from "@/lib/server/orders";
 import { db } from "@/lib/supabase/admin";
 import { authClient } from "@/lib/supabase/server";
 import type { OrderStatus, Settings } from "@/lib/types";
@@ -131,8 +132,17 @@ export async function saveAdminNote(orderId: string, note: string): Promise<Resu
 export async function fileDownloadUrl(path: string): Promise<string | null> {
   const staff = await requireStaff();
   if (path.startsWith("slip/") && staff.role !== "admin") return null;
-  const urls = await signedUrls([path], 60 * 10, true);
-  return urls[path] ?? null;
+  // ตั้งชื่อไฟล์ตอนดาวน์โหลดเป็น เลขออเดอร์-ลำดับ-ชื่อไฟล์เดิม ให้กราฟิกหาง่าย
+  const { data } = await db()
+    .from("order_items")
+    .select("position, file_name, orders(order_no)")
+    .eq("file_path", path)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  const orderNo = (data?.orders as unknown as { order_no: string } | null)?.order_no;
+  const name = data ? `${orderNo ?? "file"}-${data.position}-${data.file_name}` : (path.split("/").pop() ?? "file");
+  return storage.readUrl(path, 60 * 10, name);
 }
 
 // ---------- นำเข้าเลขแทร็คหลายออเดอร์ ----------
@@ -293,7 +303,7 @@ export async function deleteOrderFiles(orderId: string): Promise<Result> {
   const { data: items } = await db().from("order_items").select("file_path, preview_path").eq("order_id", orderId);
   await db().from("order_items").update({ file_path: null, preview_path: null }).eq("order_id", orderId);
   await removeIfUnreferenced((items ?? []).flatMap((i) => [i.file_path, i.preview_path]));
-  if (o?.slip_path) await db().storage.from(STORAGE_BUCKET).remove([o.slip_path]);
+  if (o?.slip_path) await storage.remove([o.slip_path]);
   await db().from("orders").update({ files_deleted_at: new Date().toISOString(), slip_path: null }).eq("id", orderId);
   refresh(orderId);
   return { ok: true };

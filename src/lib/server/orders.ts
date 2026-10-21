@@ -1,6 +1,6 @@
 import "server-only";
-import { STORAGE_BUCKET } from "../constants";
 import { db } from "../supabase/admin";
+import * as storage from "./storage";
 import type { Address, CheckResult, Finish, OrderStatus, ProductKey, Shape } from "../types";
 import { pushTracking, messagingEnabled } from "./line";
 import { siteUrl } from "./email";
@@ -89,21 +89,10 @@ export async function getItems(orderId: string) {
   return (data as ItemRow[]) ?? [];
 }
 
-export async function signedUrls(paths: (string | null)[], expires = 60 * 30, download = false) {
-  const list = paths.filter(Boolean) as string[];
-  if (!list.length) return {} as Record<string, string>;
+export async function signedUrls(paths: (string | null)[], expires = 60 * 30, downloadNames?: Record<string, string>) {
+  const list = [...new Set(paths.filter(Boolean) as string[])];
   const out: Record<string, string> = {};
-  if (download) {
-    await Promise.all(
-      list.map(async (p) => {
-        const { data } = await db().storage.from(STORAGE_BUCKET).createSignedUrl(p, expires, { download: true });
-        if (data) out[p] = data.signedUrl;
-      }),
-    );
-    return out;
-  }
-  const { data } = await db().storage.from(STORAGE_BUCKET).createSignedUrls(list, expires);
-  for (const d of data ?? []) if (d.path && d.signedUrl) out[d.path] = d.signedUrl;
+  await Promise.all(list.map(async (p) => (out[p] = await storage.readUrl(p, expires, downloadNames?.[p]))));
   return out;
 }
 
@@ -181,6 +170,6 @@ export async function removeIfUnreferenced(paths: (string | null | undefined)[])
   ]);
   const used = new Set([...(byFile ?? []).map((r) => r.file_path), ...(byPreview ?? []).map((r) => r.preview_path)]);
   const remove = list.filter((p) => !used.has(p));
-  if (remove.length) await db().storage.from(STORAGE_BUCKET).remove(remove);
+  if (remove.length) await storage.remove(remove);
   return remove.length;
 }

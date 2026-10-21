@@ -116,7 +116,6 @@ export function fileExt(name: string) {
   return m ? m[1].toLowerCase() : "";
 }
 
-export const STORAGE_BUCKET = "order-files";
 
 const CARRIER_ALIASES: [RegExp, CarrierKey][] = [
   [/ไปรษณีย์|thai\s*post|thailand\s*post|thaipost|ems|^th$/i, "thaipost"],

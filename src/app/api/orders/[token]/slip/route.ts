@@ -1,10 +1,10 @@
 import { NextResponse } from "next/server";
-import { STORAGE_BUCKET } from "@/lib/constants";
 import { notifyShop, siteUrl } from "@/lib/server/email";
 import { bad, readJson } from "@/lib/server/http";
 import { getOrderByToken } from "@/lib/server/orders";
 import { getSettings } from "@/lib/server/settings";
 import { verifySlip } from "@/lib/server/slip";
+import * as storage from "@/lib/server/storage";
 import { db } from "@/lib/supabase/admin";
 
 /** ส่งสลิปใหม่ หลังร้านแจ้งว่าสลิปไม่ถูกต้อง */
@@ -26,7 +26,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
     attention_note: "ลูกค้าส่งสลิปใหม่",
   };
   if (settings.slipVerify.enabled) {
-    const { data: blob } = await db().storage.from(STORAGE_BUCKET).download(up.path);
+    const blob = await storage.download(up.path);
     const res = blob ? await verifySlip(settings, blob, Number(order.total)) : null;
     if (res) {
       update.slip_verify = res;
@@ -35,7 +35,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
   }
   await db().from("orders").update(update).eq("id", order.id);
   await db().from("uploads").update({ used: true }).eq("id", up.id);
-  if (order.slip_path) await db().storage.from(STORAGE_BUCKET).remove([order.slip_path]);
+  if (order.slip_path) await storage.remove([order.slip_path]);
   await notifyShop(
     settings.notifyEmail,
     `สลิปใหม่ ${order.order_no}`,

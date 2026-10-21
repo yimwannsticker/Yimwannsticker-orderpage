@@ -1,4 +1,4 @@
-import "server-only";
+// ตรวจไฟล์ PDF / AI (PDF-compatible) ใช้ได้ทั้งใน browser และ server
 import {
   PDFArray,
   PDFDict,
@@ -171,7 +171,7 @@ function walkContent(
       // /Name
       let j = i + 1;
       while (j < len && !WS.has(bytes[j]) && !DELIM.has(bytes[j])) j++;
-      operands.push("/" + Buffer.from(bytes.subarray(i + 1, j)).toString("latin1"));
+      operands.push("/" + latin1(bytes, i + 1, j));
       i = j;
       continue;
     }
@@ -182,7 +182,7 @@ function walkContent(
       i++;
       continue;
     }
-    const tok = Buffer.from(bytes.subarray(i, j)).toString("latin1");
+    const tok = latin1(bytes, i, j);
     i = j;
     if (/^[+-]?(\d+\.?\d*|\.\d+)$/.test(tok)) {
       operands.push(parseFloat(tok));
@@ -288,9 +288,37 @@ function walkContent(
   }
 }
 
+function latin1(bytes: Uint8Array, start: number, end: number) {
+  let s = "";
+  for (let k = start; k < end; k += 8192) s += String.fromCharCode(...bytes.subarray(k, Math.min(end, k + 8192)));
+  return s;
+}
+
+function indexOfText(bytes: Uint8Array, text: string, from: number) {
+  return indexOfSeq(bytes, [...text].map((c) => c.charCodeAt(0)), from);
+}
+
+/** ต่อ content stream หลายส่วน คั่นด้วยขึ้นบรรทัดใหม่ */
+function concat(parts: Uint8Array[]) {
+  const out = new Uint8Array(parts.reduce((a, p) => a + p.length + 1, 0));
+  let o = 0;
+  for (const p of parts) {
+    out.set(p, o);
+    out[o + p.length] = 10;
+    o += p.length + 1;
+  }
+  return out;
+}
+
 function indexOfSeq(bytes: Uint8Array, seq: number[], from: number) {
-  outer: for (let i = from; i <= bytes.length - seq.length; i++) {
-    for (let k = 0; k < seq.length; k++) if (bytes[i + k] !== seq[k]) continue outer;
+  // หาไบต์แรกด้วย indexOf ของ TypedArray (เร็วกว่าวนเองมากกับไฟล์ใหญ่)
+  let i = bytes.indexOf(seq[0], from);
+  outer: while (i >= 0 && i <= bytes.length - seq.length) {
+    for (let k = 1; k < seq.length; k++)
+      if (bytes[i + k] !== seq[k]) {
+        i = bytes.indexOf(seq[0], i + 1);
+        continue outer;
+      }
     return i;
   }
   return -1;
@@ -303,15 +331,15 @@ function boxMm(arr: PDFArray | undefined) {
 }
 
 /** หาไฟล์รูปที่ถูก link ไว้จาก XMP manifest ของ Illustrator */
-export function findLinkedFiles(buf: Buffer): string[] {
+export function findLinkedFiles(buf: Uint8Array): string[] {
   const found = new Set<string>();
   let pos = 0;
   for (let guard = 0; guard < 50; guard++) {
-    const start = buf.indexOf("<xmpMM:Manifest", pos, "latin1");
+    const start = indexOfText(buf, "<xmpMM:Manifest", pos);
     if (start < 0) break;
-    const end = buf.indexOf("</xmpMM:Manifest>", start, "latin1");
+    const end = indexOfText(buf, "</xmpMM:Manifest>", start);
     if (end < 0) break;
-    const xml = buf.subarray(start, end).toString("utf8");
+    const xml = new TextDecoder("utf-8").decode(buf.subarray(start, end));
     for (const li of xml.split(/<rdf:li\b/).slice(1)) {
       if (!/ReferenceStream/.test(li)) continue;
       const m = /stRef:filePath(?:>|=")([^<"]+)/.exec(li);
@@ -330,8 +358,8 @@ const NO_PDF_CONTENT = "without PDF Content";
 export const AI_RESAVE_HOWTO =
   "วิธีบันทึกใหม่: เปิดไฟล์ใน Illustrator > File > Save As > เลือก Adobe Illustrator (ai) > ติ๊ก \"Create PDF Compatible File\" และ \"Include Linked Files\" แล้วกด OK";
 
-export async function checkPdfLike(buf: Buffer, kind: "pdf" | "ai"): Promise<CheckResult> {
-  const head = buf.subarray(0, 1024).toString("latin1");
+export async function checkPdfLike(buf: Uint8Array, kind: "pdf" | "ai", checkedBy: CheckResult["checkedBy"] = "server"): Promise<CheckResult> {
+  const head = latin1(buf, 0, Math.min(1024, buf.length));
   const issues: CheckIssue[] = [];
   const info: CheckResult["info"] = { kind };
 
@@ -350,7 +378,7 @@ export async function checkPdfLike(buf: Buffer, kind: "pdf" | "ai"): Promise<Che
     finalize(
       [...issues, { level: "yellow", message: msg }],
       { ...info, needsManualReview: true },
-      "server",
+      checkedBy,
       undefined,
       issues.some((x) => x.level === "red") ? undefined : "รอกราฟิกตรวจ",
     );
@@ -358,7 +386,7 @@ export async function checkPdfLike(buf: Buffer, kind: "pdf" | "ai"): Promise<Che
   if (!head.includes("%PDF")) {
     if (kind === "ai")
       return manual(`ไฟล์ AI นี้ไม่ได้บันทึกแบบ "Create PDF Compatible File" ระบบจึงตรวจอัตโนมัติไม่ได้ กราฟิกจะตรวจให้ภายหลัง ${AI_RESAVE_HOWTO}`);
-    return finalize([{ level: "red", message: "เปิดไฟล์ PDF ไม่ได้ ไฟล์อาจเสียหาย กรุณา export ใหม่" }], info, "server");
+    return finalize([{ level: "red", message: "เปิดไฟล์ PDF ไม่ได้ ไฟล์อาจเสียหาย กรุณา export ใหม่" }], info, checkedBy);
   }
 
   let doc: PDFDocument;
@@ -366,7 +394,7 @@ export async function checkPdfLike(buf: Buffer, kind: "pdf" | "ai"): Promise<Che
     doc = await PDFDocument.load(buf, { ignoreEncryption: true, updateMetadata: false, throwOnInvalidObject: false });
   } catch {
     if (kind === "ai") return manual(`อ่านไฟล์ AI ไม่ได้ กราฟิกจะตรวจให้ภายหลัง ${AI_RESAVE_HOWTO}`);
-    return finalize([{ level: "red", message: "เปิดไฟล์ PDF ไม่ได้ ไฟล์อาจเสียหายหรือมีรหัสผ่าน กรุณา export ใหม่" }], info, "server");
+    return finalize([{ level: "red", message: "เปิดไฟล์ PDF ไม่ได้ ไฟล์อาจเสียหายหรือมีรหัสผ่าน กรุณา export ใหม่" }], info, checkedBy);
   }
   if (doc.isEncrypted) return manual("ไฟล์มีการล็อกรหัสผ่าน ระบบตรวจอัตโนมัติไม่ได้ กราฟิกจะตรวจให้ภายหลัง");
 
@@ -395,12 +423,12 @@ export async function checkPdfLike(buf: Buffer, kind: "pdf" | "ai"): Promise<Che
       const d = decodeStream(contents);
       if (d) parts.push(d);
     }
-    const joined = Buffer.concat(parts.flatMap((p) => [Buffer.from(p), Buffer.from("\n")]));
+    const joined = concat(parts);
     walkContent(doc, joined, node.Resources(), IDENTITY, result, budget);
   });
 
   const allText = result.text.join(" ");
-  if (kind === "ai" && (allText.includes(NO_PDF_CONTENT) || buf.indexOf(NO_PDF_CONTENT, 0, "latin1") >= 0)) {
+  if (kind === "ai" && (allText.includes(NO_PDF_CONTENT) || indexOfText(buf, NO_PDF_CONTENT, 0) >= 0)) {
     return manual(`ไฟล์ AI นี้ไม่ได้บันทึกแบบ "Create PDF Compatible File" ระบบจึงตรวจอัตโนมัติไม่ได้ กราฟิกจะตรวจให้ภายหลัง ${AI_RESAVE_HOWTO}`);
   }
 
@@ -434,5 +462,5 @@ export async function checkPdfLike(buf: Buffer, kind: "pdf" | "ai"): Promise<Che
     });
   }
 
-  return finalize(issues, info, "server");
+  return finalize(issues, info, checkedBy);
 }

@@ -2,8 +2,8 @@ import { describe, expect, it } from "vitest";
 import zlib from "node:zlib";
 import { PDFDocument, StandardFonts } from "pdf-lib";
 import { DEFAULT_SETTINGS as S } from "@/lib/constants";
-import { checkPdfLike } from "@/lib/check/pdf-server";
-import { checkPsd } from "@/lib/check/psd-server";
+import { checkPdfLike } from "@/lib/check/pdf-check";
+import { checkPsd } from "@/lib/check/psd-check";
 import { dpiAtSize } from "@/lib/check/rules";
 import { applySize, perSheet } from "@/lib/sticker-size";
 

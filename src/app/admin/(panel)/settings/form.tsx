@@ -166,7 +166,7 @@ export function SettingsForm({
           <Num label="เว้นขอบแผ่น (ใช้ประมาณจำนวนดวงต่อแผ่น)" value={s.sheetMarginMm} onChange={(v) => set("sheetMarginMm", v)} suffix="มม." />
           <Num label="ระยะห่างระหว่างดวง" value={s.stickerGapMm} onChange={(v) => set("stickerGapMm", v)} suffix="มม." />
           <Num label="ขนาดดวงเล็กสุดที่รับ" value={s.minStickerMm} onChange={(v) => set("minStickerMm", v)} suffix="มม." />
-          <Num label="ขนาดไฟล์สูงสุด" value={s.maxFileMb} onChange={(v) => set("maxFileMb", v)} suffix="MB" hint="Supabase แพ็กเกจฟรีรับได้ไฟล์ละ 50MB" />
+          <Num label="ขนาดไฟล์สูงสุด" value={s.maxFileMb} onChange={(v) => set("maxFileMb", v)} suffix="MB" hint="สูงสุด 200MB" />
           <Num label="ลบไฟล์อัตโนมัติหลังส่งของ" value={s.fileRetentionDays} onChange={(v) => set("fileRetentionDays", v)} suffix="วัน" />
         </div>
       </Section>
@@ -218,6 +218,20 @@ export function SettingsForm({
 
       <Section title="ร้าน">
         <Text label="ชื่อร้าน" value={s.shopName} onChange={(v) => set("shopName", v)} />
+      </Section>
+
+      <Section title="สำรองข้อมูล">
+        <p className="text-sm text-muted">
+          ฐานข้อมูลแพ็กเกจฟรีไม่มีสำรองอัตโนมัติ แนะนำให้กดดาวน์โหลดเก็บไว้สัปดาห์ละครั้ง (ไฟล์งานลูกค้าเก็บแยกอยู่ใน Cloudflare R2)
+        </p>
+        <div className="flex flex-wrap gap-2">
+          <a href="/api/admin/export?format=json" className="btn-secondary">
+            ดาวน์โหลดข้อมูลทั้งหมด (สำหรับกู้คืน)
+          </a>
+          <a href="/api/admin/export?format=csv" className="btn-secondary">
+            ดาวน์โหลดรายการออเดอร์ (Excel)
+          </a>
+        </div>
       </Section>
 
       <div className="fixed inset-x-0 bottom-0 z-10 border-t border-line bg-white/95 backdrop-blur">
