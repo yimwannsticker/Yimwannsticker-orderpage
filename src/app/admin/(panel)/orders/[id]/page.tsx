@@ -21,6 +21,17 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
     isAdmin && order.slip_path ? signedUrls([order.slip_path], 60 * 60) : Promise.resolve({} as Record<string, string>),
     getPoints(order.customer_phone),
   ]);
+  // รายการที่สั่งซ้ำ: ชี้กลับไปออเดอร์เดิม ให้กราฟิกหาไฟล์ที่เคยแก้ไว้ได้
+  const reorderIds = items.map((i) => i.reorder_of).filter(Boolean) as string[];
+  const { data: prevRows } = reorderIds.length
+    ? await db().from("order_items").select("id, position, fix_service, order_id, orders(order_no)").in("id", reorderIds)
+    : { data: [] };
+  const prev = new Map(
+    (prevRows ?? []).map((r) => [
+      r.id as string,
+      { orderId: r.order_id as string, position: r.position as number, fixed: r.fix_service as boolean, orderNo: (r.orders as unknown as { order_no: string } | null)?.order_no ?? "" },
+    ]),
+  );
   const address = formatAddress(order.address);
   // รูปแบบสำหรับวางในระบบ MyOrder: ชื่อ เบอร์ ที่อยู่ รหัสไปรษณีย์
   const myOrderText = `${order.customer_name} ${order.customer_phone} ${address}`;
@@ -86,6 +97,15 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
                     <div className="flex flex-wrap gap-1.5">
                       {i.fix_service && <span className="rounded-full bg-blue-50 px-2 py-0.5 text-xs font-semibold text-blue-700">ให้ร้านแก้ไฟล์</span>}
                       {i.accept_risk && <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs font-semibold">ลูกค้ายอมรับความเสี่ยง</span>}
+                      {i.reorder_of && prev.get(i.reorder_of) && (
+                        <Link
+                          href={`/admin/orders/${prev.get(i.reorder_of)!.orderId}`}
+                          className="rounded-full bg-brand-50 px-2 py-0.5 text-xs font-semibold text-brand-700 underline"
+                        >
+                          ↻ สั่งซ้ำจาก {prev.get(i.reorder_of)!.orderNo} รายการที่ {prev.get(i.reorder_of)!.position}
+                          {prev.get(i.reorder_of)!.fixed && " (ครั้งก่อนร้านแก้ไฟล์ให้)"}
+                        </Link>
+                      )}
                       {i.reupload_requested && (
                         <span className="rounded-full bg-warn-bg px-2 py-0.5 text-xs font-semibold text-warn">รอลูกค้าส่งไฟล์ใหม่</span>
                       )}

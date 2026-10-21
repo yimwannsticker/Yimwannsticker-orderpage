@@ -34,7 +34,7 @@ const mm = (v: number) => (v / 25.4) * 72;
 
 async function makePdf(opts: { text?: boolean; imagePx?: number; imageMm?: number; pageMm?: [number, number] }) {
   const doc = await PDFDocument.create();
-  const [pw, ph] = opts.pageMm ?? [329, 483];
+  const [pw, ph] = opts.pageMm ?? [330, 483];
   const page = doc.addPage([mm(pw), mm(ph)]);
   page.drawRectangle({ x: 10, y: 10, width: 100, height: 100 });
   if (opts.text) {
@@ -52,7 +52,7 @@ describe("effectiveDpi", () => {
   it("เทียบกับ A3+", () => {
     expect(effectiveDpi(3886, 5705, S)).toBe(300);
     expect(effectiveDpi(5705, 3886, S)).toBe(300);
-    expect(effectiveDpi(3000, 3000, S)).toBe(232);
+    expect(effectiveDpi(3000, 3000, S)).toBe(231);
   });
 });
 
@@ -60,7 +60,7 @@ describe("checkPdfLike", () => {
   it("PDF เวกเตอร์ล้วน = เขียว", async () => {
     const r = await checkPdfLike(await makePdf({}), "pdf", S);
     expect(r.level).toBe("green");
-    expect(r.info.pageWidthMm).toBe(329);
+    expect(r.info.pageWidthMm).toBe(330);
   });
   it("PDF ฟอนต์ไม่ embed = แดง", async () => {
     const r = await checkPdfLike(await makePdf({ text: true }), "pdf", S);

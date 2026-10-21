@@ -1,8 +1,7 @@
 import { NextResponse } from "next/server";
-import { STORAGE_BUCKET } from "@/lib/constants";
 import { notifyShop, siteUrl } from "@/lib/server/email";
 import { bad, readJson } from "@/lib/server/http";
-import { getOrderByToken } from "@/lib/server/orders";
+import { getOrderByToken, removeIfUnreferenced } from "@/lib/server/orders";
 import { getSettings } from "@/lib/server/settings";
 import { db } from "@/lib/supabase/admin";
 
@@ -46,9 +45,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
     .eq("id", item.id);
   if (error) return bad("บันทึกไม่สำเร็จ", 500);
   await db().from("uploads").update({ used: true }).in("id", [up.id, pv?.id].filter(Boolean) as string[]);
-  // ลบไฟล์เก่าทิ้ง
-  const old = [item.file_path, item.preview_path].filter(Boolean) as string[];
-  if (old.length) await db().storage.from(STORAGE_BUCKET).remove(old);
+  // ลบไฟล์เก่าทิ้ง (ถ้าไม่มีออเดอร์อื่นใช้อยู่)
+  await removeIfUnreferenced([item.file_path, item.preview_path]);
 
   await db()
     .from("orders")

@@ -38,11 +38,16 @@ function StatusLine({ item }: { item: DraftItem }) {
       </div>
     );
   if (item.status === "error") return <p className="mt-2 text-sm font-medium text-bad">{item.error}</p>;
-  return item.check ? (
-    <div className="mt-2">
-      <CheckBadge level={item.check.level} title={item.check.title} />
+  return (
+    <div className="mt-2 flex flex-wrap gap-1.5">
+      {item.source && (
+        <span className="inline-flex items-center rounded-full bg-brand-50 px-3 py-1 text-sm font-semibold text-brand-700">
+          ↻ ไฟล์เดิมจาก {item.source.orderNo}
+        </span>
+      )}
+      {item.check && <CheckBadge level={item.check.level} title={item.check.title} />}
     </div>
-  ) : null;
+  );
 }
 
 /** การ์ดไฟล์ในขั้นอัปโหลด: เน้นผลตรวจไฟล์ */
@@ -182,7 +187,15 @@ export function ItemCard({
       {item.status === "done" && item.check && item.check.level !== "green" && (
         <CheckDetails check={item.check} defaultOpen={item.check.level === "red"} />
       )}
-      {item.check?.level === "red" && <RedFileChoice item={item} fixFee={settings.fixFileFee} onChange={onChange} />}
+      {item.source?.prevApproved ? (
+        <p className="rounded-xl bg-gray-50 px-3 py-2 text-sm text-muted">
+          {item.source.prevFixed
+            ? "ครั้งก่อนร้านแก้ไฟล์นี้ให้แล้ว ร้านจะพิมพ์จากไฟล์ที่แก้แล้ว"
+            : "ใช้ไฟล์เดียวกับครั้งก่อน พิมพ์ตามไฟล์เดิม"}
+        </p>
+      ) : (
+        item.check?.level === "red" && <RedFileChoice item={item} fixFee={settings.fixFileFee} onChange={onChange} />
+      )}
 
       <div>
         <p className="label">ประเภทสติกเกอร์</p>

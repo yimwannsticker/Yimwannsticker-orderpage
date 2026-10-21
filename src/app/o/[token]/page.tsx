@@ -41,6 +41,13 @@ export default async function OrderStatusPage({ params }: { params: Promise<{ to
         </div>
         <p className="mt-1 text-sm text-muted">สั่งเมื่อ {thaiDate(order.created_at)}</p>
         <p className="mt-2 text-xs text-muted">บันทึกลิงก์หน้านี้ไว้เพื่อกลับมาเช็คสถานะได้ตลอด</p>
+        {items.some((i) => i.file_path) ? (
+          <Link href={`/?reorder=${encodeURIComponent(token)}`} className="btn-secondary mt-3 w-full">
+            ↻ สั่งซ้ำแบบเดิม (ไม่ต้องส่งไฟล์ใหม่)
+          </Link>
+        ) : (
+          order.files_deleted_at && <p className="mt-2 text-xs text-muted">ไฟล์ของออเดอร์นี้ถูกลบตามระยะเวลาเก็บแล้ว ถ้าจะสั่งซ้ำกรุณาอัปโหลดไฟล์ใหม่</p>
+        )}
       </div>
 
       {order.status === "cancelled" ? (

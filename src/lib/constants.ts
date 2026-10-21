@@ -3,7 +3,7 @@ import type { Finish, OrderStatus, ProductKey, Settings } from "./types";
 export const DEFAULT_SETTINGS: Settings = {
   shopName: "Yimwann Sticker",
   sheetName: "A3+",
-  sheetWidthMm: 329,
+  sheetWidthMm: 330,
   sheetHeightMm: 483,
   tiers: [
     { min: 5, paper: 30, pp: 35 },

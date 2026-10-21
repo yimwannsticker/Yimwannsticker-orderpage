@@ -25,6 +25,8 @@ interface Body {
     freeQty: number;
     acceptRisk: boolean;
     fixService: boolean;
+    /** สั่งซ้ำ: ใช้ไฟล์จากรายการในออเดอร์เดิม (ยืนยันด้วย token ของออเดอร์นั้น) */
+    reorder?: { token: string; itemId: string } | null;
   }[];
   customer: { name: string; phone: string; address: Address; note?: string };
   slipUploadId: string;
@@ -57,18 +59,24 @@ export async function POST(req: Request) {
 
   // ไฟล์ทั้งหมดต้องอัปโหลดผ่านระบบและยังไม่ถูกใช้
   const ids = [
-    ...body.items.map((i) => i.uploadId),
-    ...(body.items.map((i) => i.previewUploadId).filter(Boolean) as string[]),
+    ...body.items.filter((i) => !i.reorder).flatMap((i) => [i.uploadId, i.previewUploadId]),
     body.slipUploadId,
-  ];
+  ].filter((x): x is string => typeof x === "string" && /^[0-9a-f-]{36}$/i.test(x));
   const { data: uploads } = await db().from("uploads").select("*").in("id", ids);
   const byId = new Map((uploads ?? []).map((u) => [u.id as string, u]));
   const slip = byId.get(body.slipUploadId);
   if (!slip || slip.kind !== "slip" || slip.used) return bad("กรุณาอัปโหลดสลิปการโอนเงิน");
 
+  const reorderItems = await loadReorderItems(body.items.map((i) => i.reorder).filter(Boolean) as { token: string; itemId: string }[]);
+
+  const missing = body.items.findIndex((i) => i.reorder && !reorderItems.has(String(i.reorder.itemId)));
+  if (missing >= 0)
+    return bad(`ไฟล์เดิมของไฟล์ที่ ${missing + 1} ถูกลบออกจากระบบแล้ว กรุณาลบรายการนี้แล้วอัปโหลดไฟล์ใหม่`);
+
   const items = body.items.map((it) => {
-    const up = byId.get(it.uploadId);
-    const pv = it.previewUploadId ? byId.get(it.previewUploadId) : null;
+    const src = it.reorder ? reorderItems.get(it.reorder.itemId) : undefined;
+    const up = src ? src.up : byId.get(it.uploadId);
+    const pv = src ? src.preview : it.previewUploadId ? byId.get(it.previewUploadId) : null;
     const product: ProductKey = it.product === "pp" ? "pp" : "paper";
     const finish: Finish =
       product === "paper" ? "gloss" : (["gloss", "matte", "clear"] as Finish[]).includes(it.finish) ? it.finish : "matte";
@@ -82,6 +90,9 @@ export async function POST(req: Request) {
       acceptRisk: Boolean(it.acceptRisk),
       fixService: Boolean(it.fixService),
       check: (up?.check_result ?? null) as CheckResult | null,
+      reorderOf: src?.itemId ?? null,
+      // ครั้งก่อนร้านแก้ไฟล์ให้แล้ว หรือลูกค้ายอมรับแล้ว ไม่ต้องเลือกใหม่
+      prevApproved: src?.prevApproved ?? false,
     };
   });
   if (items.some((i) => !i.up || i.up.kind !== "artwork" || i.up.used))
@@ -97,7 +108,7 @@ export async function POST(req: Request) {
   const quote = computeQuote(settings, items, points + pending);
   const v = validateItems(
     settings,
-    items.map((i) => ({ ...i, checkLevel: i.check?.level ?? null })),
+    items.map((i) => ({ ...i, checkLevel: i.prevApproved ? null : (i.check?.level ?? null) })),
     quote.freeSheets,
   );
   if (!v.ok) return bad(v.message!, 400, { quote });
@@ -152,6 +163,7 @@ export async function POST(req: Request) {
       items.map((it, idx) => ({
         order_id: order.id,
         position: idx + 1,
+        reorder_of: it.reorderOf,
         file_path: it.up.path,
         file_name: it.up.file_name,
         file_size: it.up.size,
@@ -173,7 +185,7 @@ export async function POST(req: Request) {
     await db().from("orders").delete().eq("id", order.id);
     return bad("บันทึกออเดอร์ไม่สำเร็จ กรุณาลองใหม่", 500);
   }
-  await db().from("uploads").update({ used: true }).in("id", ids);
+  await db().from("uploads").update({ used: true }).in("id", ids.filter((id) => byId.has(id)));
 
   // ตรวจสลิปอัตโนมัติ (ถ้าเปิดไว้)
   if (settings.slipVerify.enabled) {
@@ -200,4 +212,30 @@ export async function POST(req: Request) {
   );
 
   return NextResponse.json({ orderNo: order.order_no, token: order.token });
+}
+
+type UploadLike = { path: string; file_name: string; size: number; kind: string; used: boolean; check_result: unknown };
+
+/** หาไฟล์ของรายการในออเดอร์เดิมสำหรับสั่งซ้ำ */
+async function loadReorderItems(refs: { token: string; itemId: string }[]) {
+  const out = new Map<string, { itemId: string; up: UploadLike; preview: { path: string } | null; prevApproved: boolean }>();
+  if (!refs.length) return out;
+  const tokens = [...new Set(refs.map((r) => String(r.token)))];
+  const { data: orders } = await db().from("orders").select("id, token").in("token", tokens);
+  const orderIds = new Map((orders ?? []).map((o) => [o.token as string, o.id as string]));
+  const { data: rows } = await db()
+    .from("order_items")
+    .select("id, order_id, file_path, file_name, file_size, preview_path, check_result, accept_risk, fix_service")
+    .in("id", refs.map((r) => String(r.itemId)));
+  for (const r of refs) {
+    const row = rows?.find((x) => x.id === r.itemId && x.order_id === orderIds.get(r.token));
+    if (!row?.file_path) continue;
+    out.set(r.itemId, {
+      itemId: row.id,
+      up: { path: row.file_path, file_name: row.file_name, size: row.file_size, kind: "artwork", used: false, check_result: row.check_result },
+      preview: row.preview_path ? { path: row.preview_path } : null,
+      prevApproved: Boolean(row.fix_service || row.accept_risk),
+    });
+  }
+  return out;
 }

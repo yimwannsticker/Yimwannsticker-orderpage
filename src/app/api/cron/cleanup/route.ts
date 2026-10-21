@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { STORAGE_BUCKET } from "@/lib/constants";
+import { removeIfUnreferenced } from "@/lib/server/orders";
 import { getSettings } from "@/lib/server/settings";
 import { db } from "@/lib/supabase/admin";
 
@@ -28,9 +29,10 @@ export async function GET(req: Request) {
   let removedOrders = 0;
   for (const o of orders ?? []) {
     const { data: items } = await db().from("order_items").select("file_path, preview_path").eq("order_id", o.id);
-    const paths = [o.slip_path, ...(items ?? []).flatMap((i) => [i.file_path, i.preview_path])].filter(Boolean) as string[];
-    if (paths.length) await bucket.remove(paths);
     await db().from("order_items").update({ file_path: null, preview_path: null }).eq("order_id", o.id);
+    // ไฟล์ที่ออเดอร์ใหม่ (สั่งซ้ำ) ยังใช้อยู่จะไม่ถูกลบ
+    await removeIfUnreferenced((items ?? []).flatMap((i) => [i.file_path, i.preview_path]));
+    if (o.slip_path) await bucket.remove([o.slip_path]);
     await db().from("orders").update({ files_deleted_at: new Date().toISOString(), slip_path: null }).eq("id", o.id);
     removedOrders++;
   }

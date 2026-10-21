@@ -98,4 +98,6 @@ export interface DraftItem {
   qty: number;
   acceptRisk: boolean;
   fixService: boolean;
+  /** สั่งซ้ำ: ใช้ไฟล์จากออเดอร์เดิม ไม่ต้องอัปโหลดใหม่ */
+  source?: { token: string; itemId: string; orderNo: string; prevApproved: boolean; prevFixed: boolean } | null;
 }

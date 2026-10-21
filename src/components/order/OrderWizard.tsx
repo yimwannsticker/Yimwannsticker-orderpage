@@ -18,6 +18,25 @@ const STEPS = ["อัปโหลดไฟล์", "เลือกสติก
 const STEP_KEYS = ["upload", "items", "address", "summary"];
 const DRAFT_KEY = "yw_draft_v1";
 
+interface ReorderData {
+  orderNo: string;
+  customer: { name: string; phone: string; address: CustomerForm["address"] };
+  items: {
+    itemId: string;
+    available: boolean;
+    fileName: string;
+    fileSize: number;
+    fileType: string;
+    previewUrl: string | null;
+    check: DraftItem["check"];
+    product: NonNullable<DraftItem["product"]>;
+    finish: DraftItem["finish"];
+    qty: number;
+    prevApproved: boolean;
+    prevFixed: boolean;
+  }[];
+}
+
 interface Draft {
   items: DraftItem[];
   customer: CustomerForm;
@@ -30,7 +49,7 @@ function loadDraft(): Draft | null {
     if (!raw) return null;
     const d = JSON.parse(raw) as Draft;
     // ไฟล์ที่อัปโหลดค้างไว้ใช้ต่อไม่ได้
-    d.items = (d.items ?? []).filter((i) => i.status === "done" && i.uploadId);
+    d.items = (d.items ?? []).filter((i) => i.status === "done" && (i.uploadId || i.source));
     return d;
   } catch {
     return null;
@@ -42,14 +61,15 @@ function initialState() {
   const params = new URLSearchParams(window.location.search);
   const line = params.get("line");
   const notice = line === "ok" ? "เชื่อมต่อ LINE เรียบร้อย" : line === "failed" ? "เชื่อมต่อ LINE ไม่สำเร็จ สั่งต่อได้ตามปกติ" : null;
-  if (params.has("line") || params.has("step")) window.history.replaceState(null, "", "/");
-  if (!d) return { items: [] as DraftItem[], customer: EMPTY_CUSTOMER, step: 0, notice };
+  const reorder = params.get("reorder");
+  if (!d) return { items: [] as DraftItem[], customer: EMPTY_CUSTOMER, step: 0, notice, reorder };
   const want = STEP_KEYS.indexOf(params.get("step") ?? "");
   return {
     items: d.items,
     customer: { ...EMPTY_CUSTOMER, ...d.customer, address: { ...EMPTY_CUSTOMER.address, ...d.customer?.address } },
     step: Math.min(want >= 0 ? want : d.step, d.items.length ? 3 : 0),
     notice,
+    reorder,
   };
 }
 
@@ -59,7 +79,7 @@ export function OrderWizard({ settings }: { settings: PublicSettings }) {
   const [items, setItems] = useState<DraftItem[]>(init.items);
   const [customer, setCustomer] = useState<CustomerForm>(init.customer);
   const [step, setStep] = useState(init.step);
-  const [notice] = useState<string | null>(init.notice);
+  const [notice, setNotice] = useState<string | null>(init.notice);
   const [error, setError] = useState<string | null>(null);
   const [points, setPoints] = useState<{ points: number; pending: number } | null>(null);
   const [freeAlloc, setFreeAlloc] = useState<Record<string, number>>({});
@@ -77,6 +97,50 @@ export function OrderWizard({ settings }: { settings: PublicSettings }) {
       // พื้นที่เต็ม/โหมดส่วนตัว ไม่เป็นไร
     }
   }, [items, customer, step, done]);
+
+  // ล้างพารามิเตอร์ออกจาก URL หลังอ่านแล้ว (ทำใน effect เพราะ initializer อาจถูกเรียกซ้ำ)
+  useEffect(() => {
+    if (window.location.search) window.history.replaceState(null, "", "/");
+  }, []);
+
+  // สั่งซ้ำแบบเดิม: โหลดรายการและที่อยู่จากออเดอร์เก่า
+  useEffect(() => {
+    if (!init.reorder) return;
+    const token = init.reorder;
+    fetch(`/api/orders/${encodeURIComponent(token)}/reorder`)
+      .then((r) => (r.ok ? r.json() : Promise.reject()))
+      .then((d: ReorderData) => {
+        const list = d.items.filter((i) => i.available);
+        setItems(
+          list.map((i) => ({
+            key: crypto.randomUUID(),
+            uploadId: null,
+            previewUploadId: null,
+            previewUrl: i.previewUrl,
+            fileName: i.fileName,
+            fileSize: i.fileSize,
+            fileType: i.fileType,
+            status: "done",
+            progress: 100,
+            check: i.check,
+            product: i.product,
+            finish: i.finish,
+            qty: Math.max(i.qty, settings.minPerFile),
+            acceptRisk: false,
+            fixService: false,
+            source: { token, itemId: i.itemId, orderNo: d.orderNo, prevApproved: i.prevApproved, prevFixed: i.prevFixed },
+          })),
+        );
+        setCustomer({ ...EMPTY_CUSTOMER, name: d.customer.name, phone: d.customer.phone, address: { ...EMPTY_CUSTOMER.address, ...d.customer.address } });
+        setStep(list.length ? 1 : 0);
+        const gone = d.items.length - list.length;
+        setNotice(
+          `ดึงรายการจากออเดอร์ ${d.orderNo} แล้ว ปรับจำนวน เพิ่มหรือลบไฟล์ได้` +
+            (gone ? ` (มี ${gone} ไฟล์ที่ถูกลบออกจากระบบแล้ว กรุณาอัปโหลดใหม่)` : ""),
+        );
+      })
+      .catch(() => setNotice("ดึงออเดอร์เดิมไม่สำเร็จ กรุณาอัปโหลดไฟล์ใหม่"));
+  }, [init.reorder, settings.minPerFile]);
 
   const add = useCallback((item: DraftItem) => setItems((xs) => [...xs, item]), []);
   const update = useCallback(
@@ -137,7 +201,7 @@ export function OrderWizard({ settings }: { settings: PublicSettings }) {
       if (busy) return setError("กรุณารอให้อัปโหลดและตรวจไฟล์เสร็จก่อน");
       const v = validateItems(
         settings,
-        doneItems.map((i) => ({ ...i, freeQty: 0, checkLevel: i.check?.level })),
+        doneItems.map((i) => ({ ...i, freeQty: 0, checkLevel: i.source?.prevApproved ? null : i.check?.level })),
         0,
       );
       if (!v.ok) return setError(v.message!);
@@ -157,7 +221,11 @@ export function OrderWizard({ settings }: { settings: PublicSettings }) {
 
   async function submit() {
     setError(null);
-    const v = validateItems(settings, withFree.map((i) => ({ ...i, checkLevel: i.check?.level })), quote.freeSheets);
+    const v = validateItems(
+      settings,
+      withFree.map((i) => ({ ...i, checkLevel: i.source?.prevApproved ? null : i.check?.level })),
+      quote.freeSheets,
+    );
     if (!v.ok) return setError(v.message!);
     if (!slip) return setError("กรุณาแนบสลิปการโอนเงิน");
     if (!consent) return setError("กรุณาติ๊กยอมรับนโยบายความเป็นส่วนตัว");
@@ -176,6 +244,7 @@ export function OrderWizard({ settings }: { settings: PublicSettings }) {
             freeQty: i.freeQty,
             acceptRisk: i.acceptRisk,
             fixService: i.fixService,
+            reorder: i.source ? { token: i.source.token, itemId: i.source.itemId } : null,
           })),
           customer: { ...customer, phone },
           slipUploadId: slip.uploadId,
@@ -229,6 +298,12 @@ export function OrderWizard({ settings }: { settings: PublicSettings }) {
         <section className="space-y-3">
           <h1 className="text-xl font-bold">อัปโหลดไฟล์งาน</h1>
           <Dropzone onFiles={onFiles} maxMb={settings.maxFileMb} />
+          <p className="text-center text-sm text-muted">
+            เคยสั่งแล้ว อยากได้แบบเดิม?{" "}
+            <Link href="/track?reorder=1" className="font-semibold text-brand-600 underline">
+              สั่งซ้ำจากออเดอร์เก่า
+            </Link>
+          </p>
           {items.map((it) => (
             <UploadRow key={it.key} item={it} onRemove={() => remove(it.key)} />
           ))}

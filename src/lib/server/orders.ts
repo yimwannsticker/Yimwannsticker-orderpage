@@ -62,6 +62,7 @@ export interface ItemRow {
   reupload_requested: boolean;
   reupload_reason: string | null;
   reuploaded_at: string | null;
+  reorder_of: string | null;
 }
 
 export async function getPoints(phone: string) {
@@ -161,4 +162,21 @@ export async function getOrCreateCustomer(phone: string, name: string, lineUserI
       .update({ name, ...(lineUserId ? { line_user_id: lineUserId } : {}) })
       .eq("phone", phone);
   }
+}
+
+/**
+ * ลบไฟล์ออกจาก Storage เฉพาะไฟล์ที่ไม่มีรายการไหนใช้อยู่แล้ว
+ * (ไฟล์เดียวกันอาจถูกใช้ในหลายออเดอร์เมื่อลูกค้าสั่งซ้ำ) เรียกหลังจากล้าง path ของรายการเดิมแล้ว
+ */
+export async function removeIfUnreferenced(paths: (string | null | undefined)[]) {
+  const list = [...new Set(paths.filter(Boolean) as string[])];
+  if (!list.length) return 0;
+  const [{ data: byFile }, { data: byPreview }] = await Promise.all([
+    db().from("order_items").select("file_path").in("file_path", list),
+    db().from("order_items").select("preview_path").in("preview_path", list),
+  ]);
+  const used = new Set([...(byFile ?? []).map((r) => r.file_path), ...(byPreview ?? []).map((r) => r.preview_path)]);
+  const remove = list.filter((p) => !used.has(p));
+  if (remove.length) await db().storage.from(STORAGE_BUCKET).remove(remove);
+  return remove.length;
 }

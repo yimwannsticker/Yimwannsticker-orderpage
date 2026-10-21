@@ -1,12 +1,21 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { Suspense, useState } from "react";
 import { Alert, Spinner } from "@/components/ui";
 
 export default function TrackPage() {
+  return (
+    <Suspense>
+      <TrackForm />
+    </Suspense>
+  );
+}
+
+function TrackForm() {
   const router = useRouter();
+  const reorder = useSearchParams().get("reorder") === "1";
   const [orderNo, setOrderNo] = useState("");
   const [phone, setPhone] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -24,7 +33,7 @@ export default function TrackPage() {
       });
       const json = await res.json();
       if (!res.ok) return setError(json.error);
-      router.push(`/o/${json.token}`);
+      router.push(reorder ? `/?reorder=${encodeURIComponent(json.token)}` : `/o/${json.token}`);
     } catch {
       setError("อินเทอร์เน็ตขัดข้อง กรุณาลองใหม่");
     } finally {
@@ -37,7 +46,10 @@ export default function TrackPage() {
       <Link href="/" className="text-sm text-brand-600">
         ← กลับไปหน้าสั่งพิมพ์
       </Link>
-      <h1 className="mt-3 text-2xl font-bold">เช็คสถานะออเดอร์</h1>
+      <h1 className="mt-3 text-2xl font-bold">{reorder ? "สั่งซ้ำจากออเดอร์เก่า" : "เช็คสถานะออเดอร์"}</h1>
+      {reorder && (
+        <p className="mt-1 text-sm text-muted">กรอกเลขออเดอร์เก่าและเบอร์โทร ระบบจะดึงไฟล์ ประเภท จำนวน และที่อยู่เดิมมาให้ แก้ไขได้ก่อนสั่ง</p>
+      )}
       <form onSubmit={submit} className="card mt-4 space-y-4">
         <div>
           <label className="label" htmlFor="no">
@@ -53,7 +65,7 @@ export default function TrackPage() {
         </div>
         {error && <Alert tone="bad">{error}</Alert>}
         <button className="btn-primary w-full" disabled={busy || !orderNo || !phone}>
-          {busy ? <Spinner /> : "ค้นหา"}
+          {busy ? <Spinner /> : reorder ? "ดึงรายการเดิม" : "ค้นหา"}
         </button>
       </form>
     </main>
