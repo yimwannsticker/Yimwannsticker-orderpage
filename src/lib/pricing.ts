@@ -144,37 +144,46 @@ export function defaultFreeAllocation(qtys: number[], free: number) {
   return out;
 }
 
+/** ส่วนของการ์ดไฟล์ที่ยังไม่ครบ (ใช้ไฮไลต์กรอบแดง) */
+export type ItemField = "shape" | "size" | "product" | "qty" | "risk";
+
 export interface ItemValidation {
   ok: boolean;
   message?: string;
+  /** ลำดับไฟล์ที่มีปัญหา */
+  index?: number;
+  field?: ItemField;
 }
 
-export function validateItems(
-  s: Pick<
-    Settings,
-    "minPerFile" | "sheetWidthMm" | "sheetHeightMm" | "sheetMarginMm" | "stickerGapMm" | "cornerMarkMm" | "minStickerMm"
-  >,
-  items: (QuoteItemInput & {
-    checkLevel?: string | null;
-    acceptRisk?: boolean;
-    shape: Shape | null;
-    widthMm: number | null;
-    heightMm: number | null;
-  })[],
-  freeSheets: number,
-): ItemValidation {
+type ValidationSettings = Pick<
+  Settings,
+  "minPerFile" | "sheetWidthMm" | "sheetHeightMm" | "sheetMarginMm" | "stickerGapMm" | "cornerMarkMm" | "minStickerMm"
+>;
+
+type ValidationItem = QuoteItemInput & {
+  checkLevel?: string | null;
+  acceptRisk?: boolean;
+  shape: Shape | null;
+  widthMm: number | null;
+  heightMm: number | null;
+};
+
+/** ปัญหาแรกของไฟล์หนึ่งรายการ (null = ครบแล้ว) */
+export function itemProblem(s: ValidationSettings, it: ValidationItem): { field: ItemField; message: string } | null {
+  const size = validateSize(it, s);
+  if (!size.ok) return { field: size.field!, message: size.message! };
+  if (!it.product) return { field: "product", message: "กรุณาเลือกประเภทสติกเกอร์" };
+  if (!Number.isInteger(it.qty) || it.qty < s.minPerFile) return { field: "qty", message: `ขั้นต่ำ ${s.minPerFile} แผ่น` };
+  if (it.checkLevel === "red" && !it.acceptRisk && !it.fixService)
+    return { field: "risk", message: "ไฟล์ต้องแก้ไข กรุณาติ๊กยอมรับ หรือเลือกให้ร้านช่วยแก้ไฟล์" };
+  return null;
+}
+
+export function validateItems(s: ValidationSettings, items: ValidationItem[], freeSheets: number): ItemValidation {
   if (!items.length) return { ok: false, message: "ยังไม่มีไฟล์ในออเดอร์" };
   for (const [i, it] of items.entries()) {
-    const size = validateSize(it, s);
-    if (!size.ok) return { ok: false, message: `ไฟล์ที่ ${i + 1}: ${size.message}` };
-    if (!it.product) return { ok: false, message: `ไฟล์ที่ ${i + 1}: กรุณาเลือกประเภทสติกเกอร์` };
-    if (!Number.isInteger(it.qty) || it.qty < s.minPerFile)
-      return { ok: false, message: `ไฟล์ที่ ${i + 1}: ขั้นต่ำ ${s.minPerFile} แผ่น` };
-    if (it.checkLevel === "red" && !it.acceptRisk && !it.fixService)
-      return {
-        ok: false,
-        message: `ไฟล์ที่ ${i + 1}: ไฟล์ต้องแก้ไข กรุณาติ๊กยอมรับ หรือเลือกให้ร้านช่วยแก้ไฟล์`,
-      };
+    const p = itemProblem(s, it);
+    if (p) return { ok: false, index: i, field: p.field, message: `ไฟล์ที่ ${i + 1}: ${p.message}` };
   }
   const allocated = items.reduce((a, it) => a + (it.freeQty ?? 0), 0);
   if (items.some((it) => (it.freeQty ?? 0) < 0 || !Number.isInteger(it.freeQty ?? 0)))

@@ -3,10 +3,11 @@
 import { useState } from "react";
 import { PP_FINISHES, PRODUCTS, SHAPES } from "@/lib/constants";
 import { baht, fileSizeText } from "@/lib/format";
-import type { QuoteLine } from "@/lib/pricing";
+import type { ItemField, QuoteLine } from "@/lib/pricing";
 import { applySize, cm, fileAspect, itemCheck, maxSharpText, perSheet } from "@/lib/sticker-size";
 import type { CheckResult, DraftItem, ProductKey, PublicSettings, Shape } from "@/lib/types";
 import { CheckBadge, CheckDetails, FileIcon, NumberStepper, Spinner } from "../ui";
+import { INVALID_INPUT } from "./AddressForm";
 
 function Thumb({ item, size = "h-20 w-20" }: { item: DraftItem; size?: string }) {
   return (
@@ -161,8 +162,32 @@ function ProductPicker({ value, onChange }: { value: ProductKey | null; onChange
   );
 }
 
+export type ItemProblem = { field: ItemField; message: string } | null;
+
+/** กรอบแดง + ข้อความใต้ส่วนที่ยังไม่ครบ */
+function Invalid({ on, msg, children }: { on: boolean; msg?: string; children: React.ReactNode }) {
+  return (
+    <div data-invalid={on || undefined} className={on ? "-m-2 rounded-2xl bg-bad-bg/40 p-2 ring-2 ring-bad" : ""}>
+      {children}
+      {on && msg && <p className="mt-2 text-sm font-medium text-bad">{msg}</p>}
+    </div>
+  );
+}
+
 /** ช่องกรอกขนาดเป็นเซนติเมตร (เก็บค่าเป็นมิลลิเมตร) */
-function CmInput({ id, label, mm, onChange }: { id: string; label: string; mm: number | null; onChange: (mm: number | null) => void }) {
+function CmInput({
+  id,
+  label,
+  mm,
+  invalid,
+  onChange,
+}: {
+  id: string;
+  label: string;
+  mm: number | null;
+  invalid?: boolean;
+  onChange: (mm: number | null) => void;
+}) {
   const [text, setText] = useState<string | null>(null);
   return (
     <div className="min-w-0 flex-1">
@@ -172,7 +197,8 @@ function CmInput({ id, label, mm, onChange }: { id: string; label: string; mm: n
       <div className="relative">
         <input
           id={id}
-          className="input pr-12 text-lg font-semibold"
+          className={`input pr-12 text-lg font-semibold ${invalid ? INVALID_INPUT : ""}`}
+          aria-invalid={invalid || undefined}
           inputMode="decimal"
           placeholder="0"
           value={text ?? (mm ? cm(mm) : "")}
@@ -202,7 +228,18 @@ const SHAPE_ICON: Record<Shape, React.ReactNode> = {
 };
 
 /** เลือกทรงไดคัทและขนาดดวง */
-function SizePicker({ item, settings, onChange }: { item: DraftItem; settings: PublicSettings; onChange: (p: Partial<DraftItem>) => void }) {
+function SizePicker({
+  item,
+  settings,
+  problem,
+  onChange,
+}: {
+  item: DraftItem;
+  settings: PublicSettings;
+  problem: ItemProblem;
+  onChange: (p: Partial<DraftItem>) => void;
+}) {
+  const badSize = problem?.field === "size";
   const aspect = fileAspect(item.check);
   const [lock, setLock] = useState(Boolean(aspect));
   const circle = item.shape === "circle";
@@ -216,7 +253,7 @@ function SizePicker({ item, settings, onChange }: { item: DraftItem; settings: P
 
   return (
     <div className="space-y-3 rounded-2xl bg-gray-50 p-3">
-      <div>
+      <Invalid on={problem?.field === "shape"} msg={problem?.message}>
         <p className="label">รูปทรงไดคัท</p>
         <div className="grid grid-cols-3 gap-2" role="radiogroup" aria-label="รูปทรงไดคัท">
           {SHAPES.map((x) => (
@@ -245,22 +282,23 @@ function SizePicker({ item, settings, onChange }: { item: DraftItem; settings: P
         {item.shape === "freeform" && (
           <p className="mt-1 text-xs text-muted">แนะนำไฟล์ PNG พื้นหลังโปร่งใส หรือไฟล์ AI/PDF ที่มีเส้นไดคัท (ถ้าไม่มี กราฟิกจะทำเส้นตัดให้)</p>
         )}
-      </div>
+      </Invalid>
 
       {item.shape && (
         <div className="space-y-2">
           <p className="label !mb-0">ขนาดต่อดวง</p>
           <div className="flex items-end gap-2">
             {circle ? (
-              <CmInput id={`w-${item.key}`} label="เส้นผ่านศูนย์กลาง" mm={item.widthMm} onChange={setW} />
+              <CmInput id={`w-${item.key}`} label="เส้นผ่านศูนย์กลาง" mm={item.widthMm} invalid={badSize} onChange={setW} />
             ) : (
               <>
-                <CmInput id={`w-${item.key}`} label="กว้าง" mm={item.widthMm} onChange={setW} />
+                <CmInput id={`w-${item.key}`} label="กว้าง" mm={item.widthMm} invalid={badSize && !item.widthMm || badSize && !!item.heightMm} onChange={setW} />
                 <span className="pb-3 text-muted">×</span>
-                <CmInput id={`h-${item.key}`} label="ยาว" mm={item.heightMm} onChange={setH} />
+                <CmInput id={`h-${item.key}`} label="ยาว" mm={item.heightMm} invalid={badSize && !item.heightMm || badSize && !!item.widthMm} onChange={setH} />
               </>
             )}
           </div>
+          {badSize && <p className="text-sm font-medium text-bad">{problem?.message}</p>}
           {!circle && aspect && (
             <label className="flex items-center gap-2 text-sm">
               <input
@@ -317,6 +355,7 @@ export function ItemCard({
   index,
   line,
   settings,
+  problem = null,
   onChange,
   onRemove,
 }: {
@@ -324,12 +363,14 @@ export function ItemCard({
   index: number;
   line: QuoteLine | undefined;
   settings: PublicSettings;
+  /** ส่วนที่ยังไม่ครบ (แสดงหลังกด "ถัดไป") */
+  problem?: ItemProblem;
   onChange: (p: Partial<DraftItem>) => void;
   onRemove: () => void;
 }) {
   const check = itemCheck(item, settings);
   return (
-    <div className="card space-y-4">
+    <div id={`item-${item.key}`} className={`card scroll-mt-4 space-y-4 ${problem ? "!border-bad ring-2 ring-bad/30" : ""}`}>
       <div className="flex gap-3">
         <Thumb item={item} size="h-24 w-24" />
         <div className="min-w-0 flex-1">
@@ -346,7 +387,10 @@ export function ItemCard({
         </div>
       </div>
 
-      <SizePicker item={item} settings={settings} onChange={onChange} />
+      {problem && (
+        <p className="rounded-xl bg-bad-bg px-3 py-2 text-sm font-semibold text-bad">ไฟล์นี้ยังเลือกไม่ครบ: {problem.message}</p>
+      )}
+      <SizePicker item={item} settings={settings} problem={problem} onChange={onChange} />
 
       {item.status === "done" && check && check.level !== "green" && (
         <CheckDetails check={check} defaultOpen={check.level === "red"} />
@@ -358,13 +402,17 @@ export function ItemCard({
             : "ใช้ไฟล์เดียวกับครั้งก่อน พิมพ์ตามไฟล์เดิม"}
         </p>
       ) : (
-        check?.level === "red" && <RedFileChoice item={item} fixFee={settings.fixFileFee} onChange={onChange} />
+        check?.level === "red" && (
+          <Invalid on={problem?.field === "risk"}>
+            <RedFileChoice item={item} fixFee={settings.fixFileFee} onChange={onChange} />
+          </Invalid>
+        )
       )}
 
-      <div>
+      <Invalid on={problem?.field === "product"} msg={problem?.message}>
         <p className="label">ประเภทสติกเกอร์</p>
         <ProductPicker value={item.product} onChange={(product) => onChange({ product })} />
-      </div>
+      </Invalid>
 
       {item.product === "pp" && (
         <div>
@@ -388,7 +436,7 @@ export function ItemCard({
         </div>
       )}
 
-      <div>
+      <Invalid on={problem?.field === "qty"} msg={problem?.message}>
         <p className="label">
           จำนวนแผ่น {settings.sheetName} (ขั้นต่ำ {settings.minPerFile} แผ่น)
         </p>
@@ -396,7 +444,7 @@ export function ItemCard({
         <p className="mt-1 text-xs text-muted">
           แผ่นขนาด {cm(settings.sheetWidthMm)} × {cm(settings.sheetHeightMm)} ซม. ร้านจัดเรียงดวงให้เต็มแผ่น
         </p>
-      </div>
+      </Invalid>
 
       {item.product && line && (
         <div className="flex items-center justify-between rounded-xl bg-gray-50 px-4 py-3 text-sm">

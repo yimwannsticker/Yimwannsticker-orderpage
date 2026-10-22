@@ -124,6 +124,7 @@ export function applySize(check: CheckResult | null, size: StickerSize | null, s
 
 export interface SizeValidation {
   ok: boolean;
+  field?: "shape" | "size";
   message?: string;
 }
 
@@ -131,11 +132,12 @@ export function validateSize(
   size: { shape: Shape | null; widthMm: number | null; heightMm: number | null },
   s: LayoutSettings & Pick<Settings, "minStickerMm">,
 ): SizeValidation {
-  if (!size.shape) return { ok: false, message: "กรุณาเลือกรูปทรงไดคัท" };
-  if (!size.widthMm || !size.heightMm) return { ok: false, message: "กรุณาใส่ขนาดดวง" };
+  if (!size.shape) return { ok: false, field: "shape", message: "กรุณาเลือกรูปทรงไดคัท" };
+  if (!size.widthMm || !size.heightMm) return { ok: false, field: "size", message: "กรุณาใส่ขนาดดวง" };
   if (Math.min(size.widthMm, size.heightMm) < s.minStickerMm)
-    return { ok: false, message: `ขนาดดวงเล็กสุด ${cm(s.minStickerMm)} ซม.` };
-  if (perSheet(size.widthMm, size.heightMm, s, size.shape) < 1) return { ok: false, message: "ขนาดดวงใหญ่เกินแผ่น" };
+    return { ok: false, field: "size", message: `ขนาดดวงเล็กสุด ${cm(s.minStickerMm)} ซม.` };
+  if (perSheet(size.widthMm, size.heightMm, s, size.shape) < 1)
+    return { ok: false, field: "size", message: "ขนาดดวงใหญ่เกินแผ่น" };
   return { ok: true };
 }
 

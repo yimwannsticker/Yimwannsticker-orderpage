@@ -20,6 +20,33 @@ export const EMPTY_CUSTOMER: CustomerForm = {
   note: "",
 };
 
+export type AddressField = "name" | "phone" | "line1" | "zip" | "dist" | "prov";
+
+/** ช่องที่ยังกรอกไม่ครบ/ไม่ถูกต้อง เรียงตามลำดับบนหน้าจอ */
+export function addressErrors(v: CustomerForm): Partial<Record<AddressField, string>> {
+  const e: Partial<Record<AddressField, string>> = {};
+  if (!v.name.trim()) e.name = "กรุณากรอกชื่อผู้รับ";
+  if (!v.phone.trim()) e.phone = "กรุณากรอกเบอร์โทร 10 หลัก";
+  else if (phoneProblem(v.phone)) e.phone = phoneProblem(v.phone)!;
+  if (!v.address.line1.trim()) e.line1 = "กรุณากรอกบ้านเลขที่ / ถนน";
+  if (!/^\d{5}$/.test(v.address.zipcode)) e.zip = v.address.zipcode ? "รหัสไปรษณีย์ต้องมี 5 หลัก" : "กรุณากรอกรหัสไปรษณีย์";
+  if (!v.address.district.trim()) e.dist = "กรุณากรอกอำเภอ / เขต";
+  if (!v.address.province.trim()) e.prov = "กรุณากรอกจังหวัด";
+  return e;
+}
+
+/** กรอบแดงสำหรับช่องที่กรอกผิด */
+export const INVALID_INPUT = "!border-bad ring-2 ring-bad/20 bg-bad-bg/40";
+
+function FieldError({ id, msg }: { id: string; msg?: string }) {
+  if (!msg) return null;
+  return (
+    <p id={id} className="mt-1 text-sm font-medium text-bad">
+      {msg}
+    </p>
+  );
+}
+
 const zipCache = new Map<string, ZipEntry[]>();
 async function loadZip(zip: string): Promise<ZipEntry[]> {
   if (zipCache.has(zip)) return zipCache.get(zip)!;
@@ -29,7 +56,16 @@ async function loadZip(zip: string): Promise<ZipEntry[]> {
   return json.entries;
 }
 
-export function AddressForm({ value, onChange }: { value: CustomerForm; onChange: (v: CustomerForm) => void }) {
+export function AddressForm({
+  value,
+  onChange,
+  errors = {},
+}: {
+  value: CustomerForm;
+  onChange: (v: CustomerForm) => void;
+  /** ช่องที่ต้องไฮไลต์ (หลังกด "ถัดไป" แล้วยังไม่ครบ) */
+  errors?: Partial<Record<AddressField, string>>;
+}) {
   const [paste, setPaste] = useState("");
   const [zipData, setZipData] = useState<{ zip: string; entries: ZipEntry[] } | null>(null);
   const [msg, setMsg] = useState<string | null>(null);
@@ -109,7 +145,15 @@ export function AddressForm({ value, onChange }: { value: CustomerForm; onChange
         <label className="label" htmlFor="name">
           ชื่อผู้รับ
         </label>
-        <input id="name" className="input" autoComplete="name" value={value.name} onChange={(e) => onChange({ ...value, name: e.target.value })} />
+        <input
+          id="name"
+          className={`input ${errors.name ? INVALID_INPUT : ""}`}
+          aria-invalid={Boolean(errors.name)}
+          autoComplete="name"
+          value={value.name}
+          onChange={(e) => onChange({ ...value, name: e.target.value })}
+        />
+        <FieldError id="name-err" msg={errors.name} />
       </div>
       <div>
         <label className="label" htmlFor="phone">
@@ -117,20 +161,20 @@ export function AddressForm({ value, onChange }: { value: CustomerForm; onChange
         </label>
         <input
           id="phone"
-          className="input"
+          className={`input ${errors.phone || (phoneTouched && phoneError) ? INVALID_INPUT : ""}`}
           inputMode="tel"
           autoComplete="tel"
           placeholder="0812345678"
           maxLength={13}
-          aria-invalid={Boolean(phoneError)}
+          aria-invalid={Boolean(errors.phone || (phoneTouched && phoneError))}
           aria-describedby="phone-hint"
           value={value.phone}
           onChange={(e) => onChange({ ...value, phone: e.target.value.replace(/[^\d\s+-]/g, "") })}
           onBlur={() => setPhoneTouched(true)}
         />
-        {phoneTouched && phoneError ? (
+        {errors.phone || (phoneTouched && phoneError) ? (
           <p id="phone-hint" className="mt-1 text-sm font-medium text-bad">
-            {phoneError}
+            {errors.phone ?? phoneError}
           </p>
         ) : (
           <p id="phone-hint" className="mt-1 text-xs text-muted">
@@ -144,11 +188,13 @@ export function AddressForm({ value, onChange }: { value: CustomerForm; onChange
         </label>
         <input
           id="line1"
-          className="input"
+          className={`input ${errors.line1 ? INVALID_INPUT : ""}`}
+          aria-invalid={Boolean(errors.line1)}
           autoComplete="street-address"
           value={a.line1}
           onChange={(e) => setAddr({ line1: e.target.value })}
         />
+        <FieldError id="line1-err" msg={errors.line1} />
       </div>
       <div className="grid grid-cols-2 gap-3">
         <div>
@@ -157,13 +203,15 @@ export function AddressForm({ value, onChange }: { value: CustomerForm; onChange
           </label>
           <input
             id="zip"
-            className="input"
+            className={`input ${errors.zip ? INVALID_INPUT : ""}`}
+            aria-invalid={Boolean(errors.zip)}
             inputMode="numeric"
             autoComplete="postal-code"
             maxLength={5}
             value={a.zipcode}
             onChange={(e) => setAddr({ zipcode: e.target.value.replace(/\D/g, "").slice(0, 5) })}
           />
+          <FieldError id="zip-err" msg={errors.zip} />
         </div>
         <div>
           <label className="label" htmlFor="sub">
@@ -194,13 +242,27 @@ export function AddressForm({ value, onChange }: { value: CustomerForm; onChange
           <label className="label" htmlFor="dist">
             อำเภอ / เขต
           </label>
-          <input id="dist" className="input" value={a.district} onChange={(e) => setAddr({ district: e.target.value })} />
+          <input
+            id="dist"
+            className={`input ${errors.dist ? INVALID_INPUT : ""}`}
+            aria-invalid={Boolean(errors.dist)}
+            value={a.district}
+            onChange={(e) => setAddr({ district: e.target.value })}
+          />
+          <FieldError id="dist-err" msg={errors.dist} />
         </div>
         <div>
           <label className="label" htmlFor="prov">
             จังหวัด
           </label>
-          <input id="prov" className="input" value={a.province} onChange={(e) => setAddr({ province: e.target.value })} />
+          <input
+            id="prov"
+            className={`input ${errors.prov ? INVALID_INPUT : ""}`}
+            aria-invalid={Boolean(errors.prov)}
+            value={a.province}
+            onChange={(e) => setAddr({ province: e.target.value })}
+          />
+          <FieldError id="prov-err" msg={errors.prov} />
         </div>
       </div>
       {zipData?.zip === a.zipcode && entries.length === 0 && (

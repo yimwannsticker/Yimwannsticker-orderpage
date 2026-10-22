@@ -4,11 +4,11 @@ import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { productLabel, shapeLabel } from "@/lib/constants";
 import { itemCheck, perSheet, sizeText } from "@/lib/sticker-size";
-import { baht, isValidPhone, normalizePhone, phoneProblem } from "@/lib/format";
-import { computeQuote, defaultFreeAllocation, nudgeText, validateItems } from "@/lib/pricing";
+import { baht, isValidPhone, normalizePhone } from "@/lib/format";
+import { computeQuote, defaultFreeAllocation, itemProblem, nudgeText, validateItems } from "@/lib/pricing";
 import type { DraftItem, PublicSettings } from "@/lib/types";
 import { Alert, CopyButton, NumberStepper, Spinner, Stepper } from "../ui";
-import { AddressForm, EMPTY_CUSTOMER, type CustomerForm } from "./AddressForm";
+import { AddressForm, EMPTY_CUSTOMER, addressErrors, type CustomerForm } from "./AddressForm";
 import { Dropzone } from "./Dropzone";
 import { ItemCard, UploadRow } from "./ItemCards";
 import { LineLoginCard } from "./LineLoginCard";
@@ -226,9 +226,36 @@ export function OrderWizard({ settings }: { settings: PublicSettings }) {
 
   function go(n: number) {
     setError(null);
+    setShowItemErrors(false);
+    setShowAddrErrors(false);
     setStep(n);
     topRef.current?.scrollIntoView({ behavior: "smooth" });
   }
+
+  /** เลื่อนไปช่องแรกที่มีกรอบแดง แล้ววางเคอร์เซอร์ไว้ให้แก้ได้ทันที */
+  function focusFirstInvalid() {
+    requestAnimationFrame(() => {
+      const el = document.querySelector<HTMLElement>('[aria-invalid="true"], [data-invalid="true"]');
+      if (!el) return;
+      el.scrollIntoView({ behavior: "smooth", block: "center" });
+      const input = el.matches("input, select, textarea") ? el : el.querySelector<HTMLElement>("input, select, textarea, button");
+      input?.focus({ preventScroll: true });
+    });
+  }
+
+  // ไฮไลต์ช่องที่ยังไม่ครบ หลังกด "ถัดไป" (หายเองเมื่อแก้ถูก)
+  const [showItemErrors, setShowItemErrors] = useState(false);
+  const [showAddrErrors, setShowAddrErrors] = useState(false);
+  const checkLevelOf = (i: DraftItem) => (i.source?.prevApproved ? null : itemCheck(i, settings)?.level);
+  const itemProblems = showItemErrors
+    ? Object.fromEntries(items.map((i) => [i.key, itemProblem(settings, { ...i, checkLevel: checkLevelOf(i) })]))
+    : {};
+  const addrErrors = showAddrErrors ? addressErrors(customer) : {};
+  // แก้ครบแล้ว ซ่อนข้อความเตือนในแถบล่างได้เลย
+  const fixedAll =
+    (step === 1 && showItemErrors && !Object.values(itemProblems).some(Boolean)) ||
+    (step === 2 && showAddrErrors && !Object.keys(addrErrors).length);
+  const visibleError = fixedAll ? null : error;
 
   function next() {
     if (step === 0) {
@@ -241,21 +268,25 @@ export function OrderWizard({ settings }: { settings: PublicSettings }) {
       if (busy) return setError("กรุณารอให้อัปโหลดและตรวจไฟล์เสร็จก่อน");
       const v = validateItems(
         settings,
-        doneItems.map((i) => ({ ...i, freeQty: 0, checkLevel: i.source?.prevApproved ? null : itemCheck(i, settings)?.level })),
+        doneItems.map((i) => ({ ...i, freeQty: 0, checkLevel: checkLevelOf(i) })),
         0,
       );
-      if (!v.ok) return setError(v.message!);
+      if (!v.ok) {
+        setShowItemErrors(true);
+        focusFirstInvalid();
+        const bad = doneItems.filter((i) => itemProblem(settings, { ...i, checkLevel: checkLevelOf(i) })).length;
+        return setError(bad > 1 ? `ยังเลือกไม่ครบ ${bad} ไฟล์ ดูกรอบสีแดง` : v.message!);
+      }
       setItems((xs) => xs.filter((x) => x.status === "done"));
       return go(2);
     }
     if (step === 2) {
-      const a = customer.address;
-      if (!customer.name.trim()) return setError("กรุณากรอกชื่อผู้รับ");
-      if (!isValidPhone(phone))
-        return setError(phoneProblem(customer.phone) ?? "กรุณากรอกเบอร์โทร 10 หลัก");
-      if (!a.line1.trim()) return setError("กรุณากรอกบ้านเลขที่ / ถนน");
-      if (!/^\d{5}$/.test(a.zipcode)) return setError("กรุณากรอกรหัสไปรษณีย์ 5 หลัก");
-      if (!a.district.trim() || !a.province.trim()) return setError("กรุณากรอกอำเภอและจังหวัด");
+      const errs = Object.values(addressErrors(customer));
+      if (errs.length) {
+        setShowAddrErrors(true);
+        focusFirstInvalid();
+        return setError(errs.length > 1 ? `กรอกไม่ครบ ${errs.length} ช่อง ดูกรอบสีแดง` : errs[0]!);
+      }
       return go(3);
     }
   }
@@ -376,6 +407,7 @@ export function OrderWizard({ settings }: { settings: PublicSettings }) {
               index={idx}
               line={quote.lines[idx]}
               settings={settings}
+              problem={itemProblems[it.key] ?? null}
               onChange={(p) => update(it.key, p)}
               onRemove={() => remove(it.key)}
             />
@@ -394,7 +426,7 @@ export function OrderWizard({ settings }: { settings: PublicSettings }) {
         <section className="space-y-4">
           <h1 className="text-xl font-bold">ที่อยู่จัดส่ง</h1>
           <div className="card">
-            <AddressForm value={customer} onChange={setCustomer} />
+            <AddressForm value={customer} onChange={setCustomer} errors={addrErrors} />
           </div>
           <LineLoginCard />
         </section>
@@ -470,15 +502,16 @@ export function OrderWizard({ settings }: { settings: PublicSettings }) {
         </section>
       )}
 
-      {error && (
-        <div className="mt-4">
-          <Alert tone="bad">{error}</Alert>
-        </div>
-      )}
 
       {/* แถบล่าง: ยอดรวม + ปุ่มไปต่อ */}
       <div className="fixed inset-x-0 bottom-0 z-10 border-t border-line bg-white/95 backdrop-blur">
         <div className="mx-auto max-w-xl px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-3">
+          {/* ข้อความผิดพลาดอยู่ในแถบล่าง เห็นเสมอไม่ต้องเลื่อนหา */}
+          {visibleError && (
+            <p role="alert" className="mb-2 rounded-xl bg-bad-bg px-3 py-2 text-sm font-semibold text-bad">
+              {visibleError}
+            </p>
+          )}
           {step >= 1 && quote.totalSheets > 0 && (
             <div className="mb-2">
               <div className="flex items-baseline justify-between">
