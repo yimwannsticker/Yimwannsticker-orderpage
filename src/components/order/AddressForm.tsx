@@ -179,24 +179,14 @@ export function AddressForm({
 
   return (
     <div className="space-y-4">
-      <div className="rounded-2xl bg-brand-50 p-3">
-        <label htmlFor="paste" className="label">
-          วางที่อยู่ทั้งก้อน (ไม่บังคับ)
-        </label>
-        <textarea
-          id="paste"
-          rows={3}
-          className="input min-h-24 py-3"
-          placeholder={"เช่น สมหญิง ใจดี 0812345678\n99/1 ม.3 ต.สุเทพ อ.เมืองเชียงใหม่ จ.เชียงใหม่ 50200"}
-          value={paste}
-          onChange={(e) => setPaste(e.target.value)}
-        />
-        <button type="button" className="btn-secondary mt-2 w-full" onClick={doParse} disabled={!paste.trim()}>
-          แยกเป็นช่องให้อัตโนมัติ
-        </button>
-        {msg && <p className="mt-2 text-sm text-ok">{msg}</p>}
-      </div>
-
+      {saved.list.length === 0 && (
+        <div className="flex gap-2 rounded-2xl border border-brand-200 bg-brand-50 p-3 text-sm">
+          <span aria-hidden>💡</span>
+          <p>
+            <b>เคยสั่งกับร้านแล้ว?</b> กรอกแค่ชื่อผู้รับและเบอร์โทรเดิม ที่อยู่เก่าจะขึ้นมาให้กดเลือกเลย ไม่ต้องพิมพ์ใหม่
+          </p>
+        </div>
+      )}
       <div>
         <label className="label" htmlFor="name">
           ชื่อผู้รับ
@@ -285,6 +275,26 @@ export function AddressForm({
               ส่งที่อยู่ใหม่ (ล้างช่องที่อยู่)
             </button>
           )}
+        </div>
+      )}
+      {!saved.list.some((x) => sameAddress(x.address, a)) && (
+        <div className="rounded-2xl bg-brand-50 p-3">
+          <label htmlFor="paste" className="label">
+            {saved.list.length ? "ส่งที่อยู่ใหม่? วางทั้งก้อนได้เลย" : "วางที่อยู่ทั้งก้อน"}{" "}
+            <span className="font-normal text-muted">(ไม่บังคับ)</span>
+          </label>
+          <textarea
+            id="paste"
+            rows={3}
+            className="input min-h-24 py-3"
+            placeholder={"เช่น 99/1 ม.3 ต.สุเทพ อ.เมืองเชียงใหม่ จ.เชียงใหม่ 50200"}
+            value={paste}
+            onChange={(e) => setPaste(e.target.value)}
+          />
+          <button type="button" className="btn-secondary mt-2 w-full" onClick={doParse} disabled={!paste.trim()}>
+            แยกเป็นช่องให้อัตโนมัติ
+          </button>
+          {msg && <p className="mt-2 text-sm text-ok">{msg}</p>}
         </div>
       )}
       <div>
