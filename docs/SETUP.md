@@ -205,7 +205,41 @@
 ---
 
 ## ขั้นที่ 8 (ทำทีหลังได้): เชื่อม LINE
-ดูหัวข้อ "LINE" ใน README (ต้องสร้าง LINE Login channel และเปิด Messaging API ของ LINE OA ร้าน)
+
+### 8.1 LINE Login (ลูกค้าเข้าด้วย LINE เห็นไฟล์เดิม ที่อยู่เดิม ยอดสะสม ได้ทุกเครื่อง)
+1. เปิด [developers.line.biz](https://developers.line.biz) → **Log in to Console** → เข้าด้วยบัญชี LINE ที่เป็นแอดมินของ LINE OA ร้าน
+2. เลือก **Provider** ที่ LINE OA ของร้านอยู่ (ถ้าเคยเปิด Messaging API ไว้จะมีอยู่แล้ว) ถ้ายังไม่มี กด **Create** ตั้งชื่อ เช่น `Yimwann Sticker`
+3. ใน Provider นั้น กด **Create a new channel** → เลือก **LINE Login**
+   - Region: **Thailand**
+   - Channel name: `ยิ้มหวานสติกเกอร์` (ชื่อนี้ลูกค้าเห็นตอนกดเข้าสู่ระบบ)
+   - Channel description: เช่น `เข้าสู่ระบบเพื่อสั่งพิมพ์สติกเกอร์`
+   - App types: ติ๊ก **Web app**
+   - ใส่อีเมลร้าน → ติ๊กยอมรับเงื่อนไข → **Create**
+4. แท็บ **LINE Login** → **Callback URL** → ใส่ `https://yimwann-sticker.netlify.app/api/line/callback` → **Update**
+   (ถ้าเปลี่ยนเป็นโดเมนร้านทีหลัง ต้องมาแก้ตรงนี้ด้วย)
+5. แท็บ **Basic settings**
+   - **Linked LINE Official Account** → เลือก OA ของร้าน (ตอนลูกค้าเข้าสู่ระบบ จะมีปุ่มชวนแอดเพื่อน OA)
+   - **Privacy policy URL** (ถ้ามีช่อง) → `https://yimwann-sticker.netlify.app/privacy`
+   - จด **Channel ID** และ **Channel secret** ไว้ (Channel secret ห้ามส่งให้ใคร ห้ามแคปหน้าจอ)
+6. ⚠️ **กด Publish** ที่ด้านบนของหน้า channel (สถานะเปลี่ยนจาก Developing เป็น Published)
+   ถ้าไม่กด จะมีแค่แอดมินที่เข้าสู่ระบบได้ ลูกค้าจะเข้าไม่ได้
+7. Netlify → **Site configuration** → **Environment variables** → เพิ่ม 2 ค่า
+
+| Key | Value |
+|---|---|
+| `LINE_LOGIN_CHANNEL_ID` | Channel ID |
+| `LINE_LOGIN_CHANNEL_SECRET` | Channel secret |
+
+8. Netlify → **Deploys** → **Trigger deploy** → **Deploy site** รอ 2–3 นาที
+9. ทดสอบ: เปิดหน้าเว็บในมือถือ → ต้องเห็นกล่องเขียว "เคยสั่งแล้ว? เข้าสู่ระบบด้วย LINE" → กด → อนุญาต → กลับมาหน้าเว็บ
+   - LINE ที่ยังไม่เคยใช้สั่ง: ขึ้น "เชื่อมต่อ LINE เรียบร้อย…" → สั่ง 1 ครั้ง (หรือยืนยันชื่อ + เบอร์ที่ "เลือกจากไฟล์ที่เคยสั่ง") ระบบจะผูก LINE กับเบอร์ให้
+   - ครั้งต่อไป เข้าด้วย LINE จากมือถือ/คอมเครื่องไหนก็ได้ จะขึ้นข้อความต้อนรับ ยอดสะสม ไฟล์เดิม และที่อยู่เดิมทันที
+
+**ความปลอดภัย:** ระบบจะผูก LINE กับเบอร์ก็ต่อเมื่อชื่อผู้รับตรงกับออเดอร์เก่าของเบอร์นั้น (หรือเป็นเบอร์ใหม่) คนที่พิมพ์เบอร์คนอื่นมาสั่งจะไม่ได้สิทธิ์เห็นไฟล์หรือที่อยู่ของเจ้าของเบอร์
+ถ้าลูกค้าแจ้งว่าผูก LINE ผิด: Supabase → Table Editor → `customers` → หาเบอร์ → ลบค่าในช่อง `line_user_id`
+
+### 8.2 แจ้งเลขพัสดุทาง LINE + บอทตอบเลขออเดอร์
+ดูหัวข้อ "LINE" ใน README (เปิด Messaging API ของ LINE OA ร้าน)
 
 ## ขั้นที่ 9 (ไม่บังคับ): ใช้โดเมนของร้าน
 1. ซื้อโดเมน (เช่น จาก Cloudflare Registrar หรือผู้ขายโดเมนไทย)

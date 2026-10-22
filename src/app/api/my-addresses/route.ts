@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { addressKey } from "@/lib/format";
 import { nameMatches } from "@/lib/name-match";
 import { resolveCustomer } from "@/lib/server/customer-lookup";
-import { rememberMe } from "@/lib/server/me";
+import { linkLineIfLoggedIn, rememberMe } from "@/lib/server/me";
 import { bad, readJson } from "@/lib/server/http";
 
 const MAX_ADDRESSES = 5;
@@ -11,6 +11,7 @@ const MAX_ADDRESSES = 5;
 export async function POST(req: Request) {
   const v = await resolveCustomer(req, await readJson<{ name: string; phone: string }>(req));
   if (!v.ok) return bad(v.error, v.status);
+  if (!v.fromCookie) await linkLineIfLoggedIn(v.phone);
 
   const seen = new Map<string, { address: (typeof v.orders)[number]["address"]; date: string; times: number }>();
   // เฉพาะออเดอร์ที่ส่งถึงชื่อผู้รับคนนี้

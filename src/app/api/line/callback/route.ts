@@ -2,6 +2,7 @@ import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { siteUrl } from "@/lib/server/email";
 import { exchangeCode } from "@/lib/server/line";
+import { customerByLine, getMe, linkLine, rememberMe } from "@/lib/server/me";
 import { LINE_COOKIE, sign } from "@/lib/server/signed-cookie";
 
 export async function GET(req: Request) {
@@ -18,7 +19,15 @@ export async function GET(req: Request) {
   }
   try {
     const profile = await exchangeCode(code, `${siteUrl()}/api/line/callback`);
-    const res = NextResponse.redirect(`${siteUrl()}${back}${back.includes("?") ? "&" : "?"}line=ok`);
+    // ลูกค้าเก่าที่ผูก LINE ไว้แล้ว → จำได้ทันที / เครื่องนี้จำลูกค้าไว้อยู่แล้ว → ผูก LINE ให้
+    let customer = await customerByLine(profile.userId);
+    const me = await getMe();
+    if (!customer && me) {
+      await linkLine(me.p, profile.userId);
+      customer = await customerByLine(profile.userId);
+    }
+    const res = NextResponse.redirect(`${siteUrl()}${back}${back.includes("?") ? "&" : "?"}line=${customer ? "ok" : "new"}`);
+    if (customer) rememberMe(res, customer.phone, customer.name);
     res.cookies.set(
       LINE_COOKIE,
       sign({ userId: profile.userId, name: profile.displayName, picture: profile.pictureUrl }),

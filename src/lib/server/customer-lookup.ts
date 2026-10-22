@@ -91,3 +91,12 @@ export async function resolveCustomer(
   if (!me) return { ok: false, error: "กรุณากรอกชื่อผู้รับและเบอร์โทร", status: 401 };
   return { ok: true, phone: me.p, name: me.n, fullName: me.n, orders: await loadOrders(me.p), fromCookie: true };
 }
+
+/**
+ * ควรจำ/ผูก LINE กับเบอร์นี้ไหม: เบอร์ใหม่ หรือชื่อผู้รับตรงกับออเดอร์เก่า
+ * (กันคนพิมพ์เบอร์คนอื่นมาสั่งแล้วได้สิทธิ์เห็นไฟล์/ที่อยู่ของเจ้าของเบอร์)
+ */
+export async function ownsPhone(phone: string, name: string) {
+  const prior = await loadOrders(phone);
+  return prior.length === 0 || prior.some((o) => nameMatches(name, o.customer_name));
+}

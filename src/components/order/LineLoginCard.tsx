@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from "react";
 
-export function LineLoginCard() {
+/** "track" = หน้าที่อยู่ (รับเลขพัสดุทาง LINE) · "signin" = หน้าแรก สำหรับลูกค้าเก่าที่เครื่องนี้ยังไม่รู้จัก */
+export function LineLoginCard({ variant = "track" }: { variant?: "track" | "signin" }) {
   const [state, setState] = useState<{ enabled: boolean; user: { name: string; picture?: string } | null } | null>(null);
 
   useEffect(() => {
@@ -13,6 +14,20 @@ export function LineLoginCard() {
   }, []);
 
   if (!state?.enabled) return null;
+  if (variant === "signin") {
+    if (state.user) return null;
+    return (
+      <div className="flex items-center gap-3 rounded-2xl border border-[#06C755]/40 bg-[#06C755]/5 p-3">
+        <div className="flex-1 text-sm">
+          <p className="font-semibold">เคยสั่งแล้ว? เข้าสู่ระบบด้วย LINE</p>
+          <p className="text-muted">เห็นไฟล์เดิม ที่อยู่เดิม และยอดสะสมทันที ใช้ได้ทุกเครื่อง</p>
+        </div>
+        <a href="/api/line/login?back=%2F" className="btn btn-sm shrink-0 bg-[#06C755] text-white hover:bg-[#05b34c]">
+          LINE
+        </a>
+      </div>
+    );
+  }
   if (state.user) {
     return (
       <div className="flex items-center gap-3 rounded-2xl bg-[#06C755]/10 p-3">
@@ -40,7 +55,10 @@ export function LineLoginCard() {
   return (
     <div className="rounded-2xl border border-line p-4">
       <p className="font-semibold">รับเลขพัสดุทาง LINE (ไม่บังคับ)</p>
-      <p className="mt-1 text-sm text-muted">เข้าสู่ระบบด้วย LINE แล้วร้านจะส่งเลขพัสดุให้อัตโนมัติเมื่อจัดส่ง ถ้าไม่เข้าสู่ระบบ ดูเลขพัสดุได้ที่หน้าเช็คสถานะ</p>
+      <p className="mt-1 text-sm text-muted">
+        เข้าสู่ระบบด้วย LINE แล้วร้านจะส่งเลขพัสดุให้อัตโนมัติเมื่อจัดส่ง และครั้งหน้าเข้าด้วย LINE จากเครื่องไหนก็เห็นไฟล์เดิม ที่อยู่เดิม
+        ถ้าไม่เข้าสู่ระบบ ดูเลขพัสดุได้ที่หน้าเช็คสถานะ
+      </p>
       <a href="/api/line/login?back=%2F%3Fstep%3Daddress" className="btn mt-3 w-full bg-[#06C755] text-white hover:bg-[#05b34c]">
         เข้าสู่ระบบด้วย LINE
       </a>

@@ -4,7 +4,7 @@ import { bad, readJson } from "@/lib/server/http";
 import { signedUrls, type ItemRow } from "@/lib/server/orders";
 import { sign, type FileGrant } from "@/lib/server/signed-cookie";
 import { resolveCustomer } from "@/lib/server/customer-lookup";
-import { rememberMe } from "@/lib/server/me";
+import { linkLineIfLoggedIn, rememberMe } from "@/lib/server/me";
 
 const GRANT_DAYS = 7;
 
@@ -15,6 +15,7 @@ const GRANT_DAYS = 7;
 export async function POST(req: Request) {
   const v = await resolveCustomer(req, await readJson<{ name: string; phone: string }>(req));
   if (!v.ok) return bad(v.error, v.status);
+  if (!v.fromCookie) await linkLineIfLoggedIn(v.phone);
   const { phone, orders } = v;
 
   // ไฟล์เดียวกันที่สั่งหลายครั้ง แสดงครั้งเดียว ใช้ข้อมูลจากครั้งล่าสุด

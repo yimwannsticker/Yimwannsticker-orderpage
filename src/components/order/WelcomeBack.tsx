@@ -12,6 +12,8 @@ export interface Me {
   phone: string;
   points: number;
   pending: number;
+  /** รูปโปรไฟล์ LINE (ถ้าเข้าด้วย LINE) */
+  picture?: string | null;
 }
 
 const maskPhone = (p: string) => (p.length === 10 ? `${p.slice(0, 3)}-xxx-${p.slice(6)}` : p);
@@ -45,18 +47,24 @@ export function WelcomeBack({
 
   return (
     <div className="card space-y-3 border-brand-200 bg-gradient-to-br from-brand-50 to-white">
-      <div>
-        {greeting && <p className="text-lg font-bold">{greeting}</p>}
-        <p className="mt-1 text-sm">
-          ยอดสะสม <b>{me.points}</b> แผ่น
-          {me.pending > 0 && <span className="text-muted"> (+{me.pending} รอตรวจสลิป)</span>}
-          {promo.enabled && need > 0 && (
-            <>
-              {" "}
-              · อีก <b className="text-brand-600">{need}</b> แผ่น รับแถม {promo.free} แผ่น 🎁
-            </>
-          )}
-        </p>
+      <div className="flex items-start gap-3">
+        {me.picture && (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={me.picture} alt="" className="h-12 w-12 shrink-0 rounded-full ring-2 ring-white" />
+        )}
+        <div className="min-w-0">
+          {greeting && <p className="text-lg font-bold">{greeting}</p>}
+          <p className="mt-1 text-sm">
+            ยอดสะสม <b>{me.points}</b> แผ่น
+            {me.pending > 0 && <span className="text-muted"> (+{me.pending} รอตรวจสลิป)</span>}
+            {promo.enabled && need > 0 && (
+              <>
+                {" "}
+                · อีก <b className="text-brand-600">{need}</b> แผ่น รับแถม {promo.free} แผ่น 🎁
+              </>
+            )}
+          </p>
+        </div>
       </div>
 
       {files === null ? (

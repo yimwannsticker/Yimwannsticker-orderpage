@@ -67,7 +67,14 @@ function initialState() {
   const d = loadDraft();
   const params = new URLSearchParams(window.location.search);
   const line = params.get("line");
-  const notice = line === "ok" ? "เชื่อมต่อ LINE เรียบร้อย" : line === "failed" ? "เชื่อมต่อ LINE ไม่สำเร็จ สั่งต่อได้ตามปกติ" : null;
+  const notice =
+    line === "ok"
+      ? "เข้าสู่ระบบด้วย LINE เรียบร้อย"
+      : line === "new"
+        ? "เชื่อมต่อ LINE เรียบร้อย ยังไม่เคยสั่งด้วย LINE นี้ สั่งครั้งนี้ หรือกด \"เลือกจากไฟล์ที่เคยสั่ง\" ยืนยันชื่อและเบอร์ แล้วครั้งหน้าเข้าด้วย LINE ระบบจะจำได้ทุกเครื่อง"
+        : line === "failed"
+          ? "เชื่อมต่อ LINE ไม่สำเร็จ สั่งต่อได้ตามปกติ"
+          : null;
   const reorder = params.get("reorder");
   if (!d) return { items: [] as DraftItem[], customer: EMPTY_CUSTOMER, step: 0, notice, reorder };
   const want = STEP_KEYS.indexOf(params.get("step") ?? "");
@@ -454,6 +461,7 @@ export function OrderWizard({ settings }: { settings: PublicSettings }) {
               onLogout={logout}
             />
           )}
+          {!me && <LineLoginCard variant="signin" />}
           <h1 className="text-xl font-bold">อัปโหลดไฟล์งาน</h1>
           <Dropzone onFiles={onFiles} maxMb={settings.maxFileMb} />
           <button type="button" className="btn-secondary w-full" onClick={() => setPicker(true)}>
