@@ -32,7 +32,7 @@ describe("parseAddress", () => {
   });
 });
 
-import { isValidPhone, phoneProblem } from "@/lib/format";
+import { addressKey, isValidPhone, phoneProblem } from "@/lib/format";
 describe("เบอร์โทร", () => {
   it("ต้องครบ 10 หลัก", () => {
     expect(isValidPhone("0812345678")).toBe(true);
@@ -41,5 +41,19 @@ describe("เบอร์โทร", () => {
     expect(phoneProblem("081-234-567")).toBe("เบอร์โทรต้องมี 10 หลัก (ตอนนี้ 9 หลัก)");
     expect(phoneProblem("081-234-5678")).toBeNull();
     expect(phoneProblem("+66 81 234 5678")).toBeNull();
+  });
+});
+
+describe("addressKey", () => {
+  const base = { line1: "99/1 หมู่ 3 ถนนห้วยแก้ว", subdistrict: "สุเทพ", district: "เมืองเชียงใหม่", province: "เชียงใหม่", zipcode: "50200" };
+  it("นับคำย่อเป็นที่อยู่เดียวกัน", () => {
+    expect(addressKey({ ...base, line1: "99/1 ม.3 ถ.ห้วยแก้ว" })).toBe(addressKey(base));
+    expect(addressKey({ ...base, line1: "เลขที่ 99/1 หมู่ที่ 3 ถ. ห้วยแก้ว" })).toBe(addressKey(base));
+    expect(addressKey({ ...base, subdistrict: "ต.สุเทพ", district: "อำเภอเมืองเชียงใหม่", province: "จ.เชียงใหม่" })).toBe(addressKey(base));
+  });
+  it("บ้านเลขที่/หมู่ต่างกัน = คนละที่อยู่", () => {
+    expect(addressKey({ ...base, line1: "99/1 ม.4 ถ.ห้วยแก้ว" })).not.toBe(addressKey(base));
+    expect(addressKey({ ...base, line1: "99/2 หมู่ 3 ถนนห้วยแก้ว" })).not.toBe(addressKey(base));
+    expect(addressKey({ ...base, line1: "99/1 หมู่ 3" })).not.toBe(addressKey(base));
   });
 });

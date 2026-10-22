@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { formatAddress } from "@/lib/format";
+import { addressKey } from "@/lib/format";
 import { nameMatches } from "@/lib/name-match";
 import { verifyCustomer } from "@/lib/server/customer-lookup";
 import { bad, readJson } from "@/lib/server/http";
@@ -14,8 +14,8 @@ export async function POST(req: Request) {
   const seen = new Map<string, { address: (typeof v.orders)[number]["address"]; date: string; times: number }>();
   // เฉพาะออเดอร์ที่ส่งถึงชื่อผู้รับคนนี้
   for (const o of v.orders.filter((o) => nameMatches(v.name, o.customer_name))) {
-    const key = formatAddress(o.address).toLowerCase().replace(/[\s.,]/g, "");
-    if (!key) continue;
+    if (!o.address?.line1?.trim()) continue;
+    const key = addressKey(o.address);
     const cur = seen.get(key);
     if (cur) cur.times++;
     else seen.set(key, { address: o.address, date: o.created_at, times: 1 });

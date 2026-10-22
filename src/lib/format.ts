@@ -59,3 +59,23 @@ export function formatAddress(a: {
   const prov = a.province ? (bkk ? a.province : `จ.${a.province}`) : "";
   return [a.line1, sub, dist, prov, a.zipcode].filter(Boolean).join(" ");
 }
+
+const ABBR: [RegExp, string][] = [
+  [/หมู่ที่|หมู่|ม\./g, "ม"],
+  [/ถนน|ถ\./g, "ถ"],
+  [/ซอย|ซ\./g, "ซ"],
+  [/ตรอก|ตร\./g, "ตร"],
+  [/เลขที่/g, ""],
+];
+
+/** คีย์สำหรับเทียบที่อยู่ซ้ำ: "หมู่ 3" = "ม.3", "ถนน" = "ถ." ไม่สนช่องว่าง/จุด */
+export function addressKey(a: { line1: string; subdistrict: string; district: string; province: string; zipcode: string }) {
+  let line = (a.line1 || "").toLowerCase();
+  for (const [re, to] of ABBR) line = line.replace(re, to);
+  const clean = (x: string) =>
+    (x || "")
+      .replace(/^(ตำบล|แขวง|ต\.|อำเภอ|เขต|อ\.|จังหวัด|จ\.)\s*/, "")
+      .toLowerCase()
+      .replace(/[\s.,\-/]/g, "");
+  return [line.replace(/[\s.,\-]/g, ""), clean(a.subdistrict), clean(a.district), clean(a.province), a.zipcode].join("|");
+}

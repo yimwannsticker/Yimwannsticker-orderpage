@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { guessZip, parseAddress, type ZipEntry } from "@/lib/address-parse";
-import { formatAddress, isValidPhone, normalizePhone, phoneProblem, thaiDate } from "@/lib/format";
+import { addressKey, formatAddress, isValidPhone, normalizePhone, phoneProblem, thaiDate } from "@/lib/format";
 import type { Address } from "@/lib/types";
 import { Alert } from "../ui";
 
@@ -53,10 +53,7 @@ interface SavedAddress {
   times: number;
 }
 
-function sameAddress(a: Address, b: Address) {
-  const k = (x: Address) => formatAddress(x).toLowerCase().replace(/[\s.,]/g, "");
-  return k(a) === k(b);
-}
+const sameAddress = (a: Address, b: Address) => addressKey(a) === addressKey(b);
 
 const isEmptyAddress = (a: Address) => !a.line1.trim() && !a.zipcode && !a.district.trim() && !a.province.trim();
 
