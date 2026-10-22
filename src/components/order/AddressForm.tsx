@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { guessZip, parseAddress, type ZipEntry } from "@/lib/address-parse";
-import { phoneProblem } from "@/lib/format";
+import { formatAddress, isValidPhone, normalizePhone, phoneProblem, thaiDate } from "@/lib/format";
 import type { Address } from "@/lib/types";
 import { Alert } from "../ui";
 
@@ -47,6 +47,51 @@ function FieldError({ id, msg }: { id: string; msg?: string }) {
   );
 }
 
+interface SavedAddress {
+  address: Address;
+  date: string;
+  times: number;
+}
+
+function sameAddress(a: Address, b: Address) {
+  const k = (x: Address) => formatAddress(x).toLowerCase().replace(/[\s.,]/g, "");
+  return k(a) === k(b);
+}
+
+const isEmptyAddress = (a: Address) => !a.line1.trim() && !a.zipcode && !a.district.trim() && !a.province.trim();
+
+/** ลูกค้าเก่า: กรอกชื่อผู้รับ + เบอร์โทรเดิมแล้วดึงที่อยู่ที่เคยใช้มาให้เลือก */
+function useSavedAddresses(name: string, phone: string) {
+  const [list, setList] = useState<SavedAddress[]>([]);
+  const [busy, setBusy] = useState(false);
+  const lastKey = useRef("");
+  const lookup = useCallback(async () => {
+    const p = normalizePhone(phone);
+    const n = name.trim();
+    if (n.length < 2 || !isValidPhone(p)) return null;
+    const key = `${n}|${p}`;
+    if (key === lastKey.current) return null;
+    lastKey.current = key;
+    setBusy(true);
+    try {
+      const res = await fetch("/api/my-addresses", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ name: n, phone: p }),
+      });
+      const found = res.ok ? ((await res.json()) as { addresses: SavedAddress[] }).addresses : [];
+      setList(found);
+      return found;
+    } catch {
+      lastKey.current = "";
+      return null;
+    } finally {
+      setBusy(false);
+    }
+  }, [name, phone]);
+  return { list, busy, lookup };
+}
+
 const zipCache = new Map<string, ZipEntry[]>();
 async function loadZip(zip: string): Promise<ZipEntry[]> {
   if (zipCache.has(zip)) return zipCache.get(zip)!;
@@ -74,6 +119,20 @@ export function AddressForm({
   const a = value.address;
   const setAddr = (p: Partial<Address>) => onChange({ ...value, address: { ...a, ...p } });
   const entries = zipData?.zip === a.zipcode ? zipData.entries : [];
+  const saved = useSavedAddresses(value.name, value.phone);
+
+  async function findSaved() {
+    const found = await saved.lookup();
+    // มีที่อยู่เดียวและยังไม่ได้กรอก → ใส่ให้เลย
+    if (found?.length === 1 && isEmptyAddress(a)) onChange({ ...value, address: { ...found[0].address } });
+  }
+
+  // เบอร์ครบ 10 หลัก (หรือกรอกมาแล้วจากหน้าเลือกไฟล์เดิม) → หาที่อยู่เดิมทันที
+  const phoneReady = isValidPhone(normalizePhone(value.phone));
+  useEffect(() => {
+    if (phoneReady) findSaved();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [phoneReady]);
 
   // รหัสไปรษณีย์ครบ 5 หลัก → ดึงตำบล/อำเภอ/จังหวัด
   useEffect(() => {
@@ -152,6 +211,7 @@ export function AddressForm({
           autoComplete="name"
           value={value.name}
           onChange={(e) => onChange({ ...value, name: e.target.value })}
+          onBlur={findSaved}
         />
         <FieldError id="name-err" msg={errors.name} />
       </div>
@@ -170,7 +230,10 @@ export function AddressForm({
           aria-describedby="phone-hint"
           value={value.phone}
           onChange={(e) => onChange({ ...value, phone: e.target.value.replace(/[^\d\s+-]/g, "") })}
-          onBlur={() => setPhoneTouched(true)}
+          onBlur={() => {
+            setPhoneTouched(true);
+            findSaved();
+          }}
         />
         {errors.phone || (phoneTouched && phoneError) ? (
           <p id="phone-hint" className="mt-1 text-sm font-medium text-bad">
@@ -182,6 +245,51 @@ export function AddressForm({
           </p>
         )}
       </div>
+      {saved.busy && <p className="text-sm text-muted">กำลังหาที่อยู่ที่เคยใช้...</p>}
+      {saved.list.length > 0 && (
+        <div role="radiogroup" aria-label="ที่อยู่ที่เคยใช้" className="space-y-2">
+          <p className="label mb-0">ที่อยู่ที่เคยใช้ {saved.list.length > 1 && <span className="font-normal text-muted">(แตะเพื่อเลือก)</span>}</p>
+          {saved.list.map((s, i) => {
+            const on = sameAddress(s.address, a);
+            return (
+              <button
+                key={i}
+                type="button"
+                role="radio"
+                aria-checked={on}
+                onClick={() => onChange({ ...value, address: { ...s.address } })}
+                className={`flex w-full items-start gap-3 rounded-2xl border-2 p-3 text-left transition ${
+                  on ? "border-brand-500 bg-brand-50" : "border-gray-200 bg-white hover:border-brand-300"
+                }`}
+              >
+                <span
+                  className={`mt-1 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 ${
+                    on ? "border-brand-500 bg-brand-500 text-xs text-white" : "border-gray-300"
+                  }`}
+                >
+                  {on && "✓"}
+                </span>
+                <span className="min-w-0">
+                  <span className="block">{formatAddress(s.address)}</span>
+                  <span className="mt-0.5 block text-xs text-muted">
+                    ใช้ล่าสุด {thaiDate(s.date)}
+                    {s.times > 1 && ` · ใช้ ${s.times} ครั้ง`}
+                  </span>
+                </span>
+              </button>
+            );
+          })}
+          {saved.list.some((s) => sameAddress(s.address, a)) && (
+            <button
+              type="button"
+              className="text-sm text-brand-600 underline"
+              onClick={() => onChange({ ...value, address: { ...EMPTY_CUSTOMER.address } })}
+            >
+              ส่งที่อยู่ใหม่ (ล้างช่องที่อยู่)
+            </button>
+          )}
+        </div>
+      )}
       <div>
         <label className="label" htmlFor="line1">
           บ้านเลขที่ หมู่ ซอย ถนน

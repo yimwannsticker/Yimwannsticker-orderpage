@@ -1,0 +1,24 @@
+import { NextResponse } from "next/server";
+import { formatAddress } from "@/lib/format";
+import { nameMatches } from "@/lib/name-match";
+import { verifyCustomer } from "@/lib/server/customer-lookup";
+import { bad, readJson } from "@/lib/server/http";
+
+const MAX_ADDRESSES = 5;
+
+/** ที่อยู่ที่ลูกค้าเก่าเคยใช้ (ยืนยันด้วยชื่อผู้รับ + เบอร์โทร) ไม่ซ้ำกัน ล่าสุดก่อน */
+export async function POST(req: Request) {
+  const v = await verifyCustomer(req, await readJson<{ name: string; phone: string }>(req));
+  if (!v.ok) return bad(v.error, v.status);
+
+  const seen = new Map<string, { address: (typeof v.orders)[number]["address"]; date: string; times: number }>();
+  // เฉพาะออเดอร์ที่ส่งถึงชื่อผู้รับคนนี้
+  for (const o of v.orders.filter((o) => nameMatches(v.name, o.customer_name))) {
+    const key = formatAddress(o.address).toLowerCase().replace(/[\s.,]/g, "");
+    if (!key) continue;
+    const cur = seen.get(key);
+    if (cur) cur.times++;
+    else seen.set(key, { address: o.address, date: o.created_at, times: 1 });
+  }
+  return NextResponse.json({ addresses: [...seen.values()].slice(0, MAX_ADDRESSES) });
+}

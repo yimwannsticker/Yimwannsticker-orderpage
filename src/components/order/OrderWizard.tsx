@@ -674,13 +674,13 @@ function DoneScreen({ orderNo, token, contactLine }: { orderNo: string; token: s
         <Alert tone="warn">
           <b>บันทึกลิงก์นี้ไว้</b> เพื่อเช็คสถานะและเลขพัสดุ (หรือแคปหน้าจอนี้ไว้)
         </Alert>
-        <p className="break-all rounded-xl bg-gray-50 p-3 text-sm">{url}</p>
-        <div className="flex gap-2">
-          <CopyButton text={url} label="คัดลอกลิงก์" className="flex-1" />
-          <Link href={`/o/${token}`} className="btn-primary btn-sm flex-1">
-            ไปหน้าเช็คสถานะ
-          </Link>
+        <div className="flex items-center gap-2 rounded-xl bg-gray-50 p-2 pl-3">
+          <p className="min-w-0 flex-1 break-all text-sm">{url}</p>
+          <CopyButton text={url} label="คัดลอกลิงก์" className="shrink-0" />
         </div>
+        <Link href={`/o/${token}`} className="btn-primary btn-sm w-full">
+          ไปหน้าเช็คสถานะ
+        </Link>
         <p className="text-sm text-muted">
           ดูสถานะได้อีกทางที่หน้า <Link href="/track" className="text-brand-600 underline">เช็คสถานะ</Link> ด้วยเลขออเดอร์ + เบอร์โทร
           {contactLine && <> หรือพิมพ์เลขออเดอร์ใน LINE {contactLine}</>}
