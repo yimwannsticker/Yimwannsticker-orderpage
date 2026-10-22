@@ -7,7 +7,9 @@ import { baht, fileSizeText, formatAddress, thaiDate } from "@/lib/format";
 import { requireStaff } from "@/lib/server/auth";
 import { getItems, getPoints, signedUrls, statusUrl, type OrderRow } from "@/lib/server/orders";
 import { db } from "@/lib/supabase/admin";
+import type { CheckResult, Trim } from "@/lib/types";
 import { AdminNote, DownloadButton, ItemActions, MarkSeen, PaymentActions, StatusActions, TrackingForm } from "./client";
+import { AdminPreview } from "./preview";
 
 export default async function OrderDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const staff = await requireStaff();
@@ -66,19 +68,11 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
             {items.map((i) => (
               <div key={i.id} className="rounded-2xl border border-line p-3">
                 <div className="flex gap-3">
-                  <a
-                    href={i.preview_path ? previews[i.preview_path] : undefined}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="h-28 w-28 shrink-0 overflow-hidden rounded-xl bg-gray-50"
-                  >
-                    {i.preview_path && previews[i.preview_path] ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img src={previews[i.preview_path]} alt="" className="h-full w-full object-contain" />
-                    ) : (
-                      <span className="flex h-full items-center justify-center text-xs text-muted">ไม่มีตัวอย่าง</span>
-                    )}
-                  </a>
+                  <AdminPreview
+                    url={i.preview_path ? (previews[i.preview_path] ?? null) : null}
+                    fileName={i.file_name}
+                    trim={i.trim}
+                  />
                   <div className="min-w-0 flex-1 space-y-1 text-sm">
                     <p className="font-semibold">
                       {i.position}. {i.file_name}
@@ -102,6 +96,11 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
                       </p>
                     )}
                     <div className="flex flex-wrap gap-1.5">
+                      {i.trim && (
+                        <span className="rounded-full bg-brand-50 px-2 py-0.5 text-xs font-semibold text-brand-700">
+                          ✂️ ลูกค้าเลือกตัดพื้นหลังรอบงาน · {trimText(i.trim, i.check_result)}
+                        </span>
+                      )}
                       {i.fix_service && <span className="rounded-full bg-blue-50 px-2 py-0.5 text-xs font-semibold text-blue-700">ให้ร้านแก้ไฟล์</span>}
                       {i.accept_risk && <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs font-semibold">ลูกค้ายอมรับความเสี่ยง</span>}
                       {i.reorder_of && prev.get(i.reorder_of) && (
@@ -246,4 +245,18 @@ function Row({ label, value }: { label: string; value: string }) {
       <span>{value}</span>
     </div>
   );
+}
+
+/** บอกกราฟิกว่าต้องใช้ส่วนไหนของไฟล์ (check_result เก็บขนาดหลังตัดแล้ว) */
+function trimText(t: Trim, check: CheckResult | null) {
+  const color = t.color === "transparent" ? "โปร่งใส" : t.color.toUpperCase();
+  const w = check?.info.widthPx;
+  const h = check?.info.heightPx;
+  if (w && h) {
+    const fullW = check?.info.fullWidthPx ?? Math.round(w / t.w);
+    const fullH = check?.info.fullHeightPx ?? Math.round(h / t.h);
+    return `พื้น ${color} · ใช้ส่วนงาน ${w}×${h} px เริ่มที่ซ้าย ${Math.round(fullW * t.x)} บน ${Math.round(fullH * t.y)} px (ไฟล์เต็ม ${fullW}×${fullH})`;
+  }
+  const pct = (n: number) => `${Math.round(n * 100)}%`;
+  return `พื้น ${color} · ใช้ส่วนงานกว้าง ${pct(t.w)} สูง ${pct(t.h)} ของหน้า เริ่มที่ซ้าย ${pct(t.x)} บน ${pct(t.y)}`;
 }

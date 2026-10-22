@@ -1,6 +1,6 @@
 import { dpiAtSize, dpiLevel, finalize, type CheckSettings } from "./check/rules";
 import { piecesPerSheet } from "./sheet-layout";
-import type { CheckIssue, CheckResult, Settings, Shape } from "./types";
+import type { CheckIssue, CheckResult, Settings, Shape, Trim } from "./types";
 
 export interface StickerSize {
   shape: Shape;
@@ -35,6 +35,37 @@ export function sizeText(size: { shape: Shape | null; widthMm: number | null; he
 }
 
 /** สัดส่วน กว้าง/ยาว ของไฟล์ (จากพิกเซล หรือขนาดหน้า PDF) */
+/** รับค่า trim จาก browser: ต้องอยู่ในไฟล์ และไม่เล็กเกินไป (null = ไม่ตัด) */
+export function cleanTrim(t: unknown): Trim | null {
+  if (!t || typeof t !== "object") return null;
+  const o = t as Record<string, unknown>;
+  const [x, y, w, h] = [o.x, o.y, o.w, o.h].map(Number);
+  const color = String(o.color ?? "");
+  if (![x, y, w, h].every(Number.isFinite)) return null;
+  if (x < 0 || y < 0 || w < 0.02 || h < 0.02 || x + w > 1.001 || y + h > 1.001) return null;
+  if (color !== "transparent" && !/^#[0-9a-f]{6}$/i.test(color)) return null;
+  const r = (n: number) => Math.round(n * 10000) / 10000;
+  return { x: r(x), y: r(y), w: r(Math.min(w, 1 - x)), h: r(Math.min(h, 1 - y)), color: color.toLowerCase() };
+}
+
+/** ผลตรวจไฟล์เมื่อใช้เฉพาะส่วนงาน (ตัดพื้นหลังรอบงานแล้ว): พิกเซล/ขนาดหน้าเล็กลงตามกรอบ */
+export function trimCheck(check: CheckResult | null, trim: Trim | null | undefined): CheckResult | null {
+  if (!check || !trim) return check;
+  const i = check.info;
+  return {
+    ...check,
+    info: {
+      ...i,
+      fullWidthPx: i.widthPx,
+      fullHeightPx: i.heightPx,
+      widthPx: i.widthPx ? Math.max(1, Math.round(i.widthPx * trim.w)) : i.widthPx,
+      heightPx: i.heightPx ? Math.max(1, Math.round(i.heightPx * trim.h)) : i.heightPx,
+      pageWidthMm: i.pageWidthMm ? i.pageWidthMm * trim.w : i.pageWidthMm,
+      pageHeightMm: i.pageHeightMm ? i.pageHeightMm * trim.h : i.pageHeightMm,
+    },
+  };
+}
+
 export function fileAspect(check: CheckResult | null) {
   const i = check?.info;
   if (i?.widthPx && i.heightPx) return i.widthPx / i.heightPx;
@@ -143,10 +174,10 @@ export function validateSize(
 
 /** ผลตรวจของรายการ ตามขนาดดวงที่เลือกตอนนี้ */
 export function itemCheck(
-  item: { check: CheckResult | null; shape: Shape | null; widthMm: number | null; heightMm: number | null },
+  item: { check: CheckResult | null; shape: Shape | null; widthMm: number | null; heightMm: number | null; trim?: Trim | null },
   s: CheckSettings,
 ) {
   const size =
     item.shape && item.widthMm && item.heightMm ? { shape: item.shape, widthMm: item.widthMm, heightMm: item.heightMm } : null;
-  return applySize(item.check, size, s);
+  return applySize(trimCheck(item.check, item.trim), size, s);
 }

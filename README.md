@@ -65,7 +65,7 @@
 
 ### 1. Supabase (ฐานข้อมูล)
 1. สร้างโปรเจกต์ที่ [supabase.com](https://supabase.com) (แพ็กเกจฟรี) เลือก region Singapore
-2. เปิด SQL Editor แล้วรันไฟล์ใน `supabase/migrations/` ทีละไฟล์ตามลำดับเลข (`0001_init.sql` ถึง `0005_heartbeat.sql`)
+2. เปิด SQL Editor แล้วรันไฟล์ใน `supabase/migrations/` ทีละไฟล์ตามลำดับเลข (`0001_init.sql` ถึง `0006_trim.sql`)
 3. Authentication → URL Configuration: ตั้ง Site URL เป็นโดเมนเว็บ และเพิ่ม `https://<โดเมน>/admin/auth/callback` ใน Redirect URLs
 4. Authentication → Users → Add user: สร้างบัญชีอีเมล+รหัสผ่านของเจ้าของร้าน (อีเมลที่อยู่ใน `ADMIN_EMAILS` จะได้สิทธิ์แอดมินอัตโนมัติเมื่อล็อกอินครั้งแรก)
 5. Project Settings → API: คัดลอก Project URL, anon key, service_role key

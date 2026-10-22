@@ -32,7 +32,7 @@
 
 ### 1.2 สร้างตารางฐานข้อมูล
 ต้องรันไฟล์ทั้งหมด 5 ไฟล์ **ตามลำดับ**:
-`0001_init.sql` → `0002_reorder.sql` → `0003_lookup_attempts.sql` → `0004_sticker_size.sql` → `0005_heartbeat.sql`
+`0001_init.sql` → `0002_reorder.sql` → `0003_lookup_attempts.sql` → `0004_sticker_size.sql` → `0005_heartbeat.sql` → `0006_trim.sql`
 
 ทำทีละไฟล์:
 1. เปิด GitHub repo ของร้าน → เปลี่ยน branch เป็น `claude/sticker-order-app` → เข้าโฟลเดอร์ `supabase/migrations` → คลิกชื่อไฟล์

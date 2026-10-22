@@ -39,6 +39,7 @@ interface ReorderData {
     shape: DraftItem["shape"];
     widthMm: number | null;
     heightMm: number | null;
+    trim: DraftItem["trim"];
     prevApproved: boolean;
     prevFixed: boolean;
   }[];
@@ -143,6 +144,7 @@ export function OrderWizard({ settings }: { settings: PublicSettings }) {
             shape: i.shape,
             widthMm: i.widthMm,
             heightMm: i.heightMm,
+            trim: i.trim,
             acceptRisk: false,
             fixService: false,
             source: { token, itemId: i.itemId, orderNo: d.orderNo, prevApproved: i.prevApproved, prevFixed: i.prevFixed },
@@ -228,6 +230,7 @@ export function OrderWizard({ settings }: { settings: PublicSettings }) {
           shape: f.shape,
           widthMm: f.widthMm,
           heightMm: f.heightMm,
+          trim: f.trim,
           acceptRisk: false,
           fixService: false,
           source: { grant: f.grant, itemId: f.itemId, orderNo: f.orderNo, prevApproved: f.prevApproved, prevFixed: f.prevFixed },
@@ -372,6 +375,7 @@ export function OrderWizard({ settings }: { settings: PublicSettings }) {
             shape: i.shape,
             widthMm: i.widthMm,
             heightMm: i.heightMm,
+            trim: i.trim ?? null,
             reorder: i.source
               ? i.source.grant
                 ? { grant: i.source.grant }

@@ -48,6 +48,7 @@ export async function POST(req: Request) {
       shape: item.shape,
       widthMm: item.width_mm === null ? null : Number(item.width_mm),
       heightMm: item.height_mm === null ? null : Number(item.height_mm),
+      trim: item.trim ?? null,
       orderNo,
       date,
       times,

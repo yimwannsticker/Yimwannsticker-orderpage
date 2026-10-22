@@ -27,6 +27,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ token: 
       shape: i.shape,
       widthMm: i.width_mm === null ? null : Number(i.width_mm),
       heightMm: i.height_mm === null ? null : Number(i.height_mm),
+      trim: i.trim ?? null,
       prevApproved: i.fix_service || i.accept_risk,
       prevFixed: i.fix_service,
     })),

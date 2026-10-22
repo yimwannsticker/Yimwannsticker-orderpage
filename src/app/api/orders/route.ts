@@ -2,7 +2,7 @@ import crypto from "node:crypto";
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { productLabel, shapeLabel } from "@/lib/constants";
-import { applySize, perSheet, sizeText } from "@/lib/sticker-size";
+import { applySize, cleanTrim, perSheet, sizeText, trimCheck } from "@/lib/sticker-size";
 import { baht, formatAddress, isValidPhone, normalizePhone } from "@/lib/format";
 import { computeQuote, validateItems } from "@/lib/pricing";
 import { notifyShop, siteUrl } from "@/lib/server/email";
@@ -32,6 +32,7 @@ interface Body {
     shape: Shape;
     widthMm: number;
     heightMm: number;
+    trim?: unknown;
     /**
      * สั่งซ้ำ: ใช้ไฟล์จากรายการในออเดอร์เดิม ยืนยันด้วย token ของออเดอร์นั้น
      * หรือ grant ที่ได้จากหน้า "ไฟล์ที่เคยสั่ง" (ยืนยันชื่อ + เบอร์แล้ว)
@@ -94,7 +95,9 @@ export async function POST(req: Request) {
     const widthMm = Math.round(Number(it.widthMm) * 10) / 10 || null;
     const heightMm = shape === "circle" ? widthMm : Math.round(Number(it.heightMm) * 10) / 10 || null;
     const size = shape && widthMm && heightMm ? { shape, widthMm, heightMm } : null;
+    const trim = cleanTrim(it.trim);
     return {
+      trim,
       up,
       shape,
       widthMm,
@@ -108,7 +111,7 @@ export async function POST(req: Request) {
       acceptRisk: Boolean(it.acceptRisk),
       fixService: Boolean(it.fixService),
       // ความคมชัดคิดตามขนาดดวงที่เลือก
-      check: applySize((up?.check_result ?? null) as CheckResult | null, size, settings),
+      check: applySize(trimCheck((up?.check_result ?? null) as CheckResult | null, trim), size, settings),
       reorderOf: src?.itemId ?? null,
       // ครั้งก่อนร้านแก้ไฟล์ให้แล้ว หรือลูกค้ายอมรับแล้ว ไม่ต้องเลือกใหม่
       prevApproved: src?.prevApproved ?? false,
@@ -187,6 +190,8 @@ export async function POST(req: Request) {
         width_mm: it.widthMm,
         height_mm: it.heightMm,
         per_sheet: it.perSheet,
+        // ใส่เฉพาะเมื่อมี (ออเดอร์ทั่วไปยังสั่งได้แม้ยังไม่ได้รัน migration 0006)
+        ...(it.trim ? { trim: it.trim } : {}),
         file_path: it.up.path,
         file_name: it.up.file_name,
         file_size: it.up.size,
@@ -226,7 +231,7 @@ export async function POST(req: Request) {
   }
 
   const lines = items
-    .map((it, i) => `${i + 1}. ${it.up.file_name} — ${productLabel(it.product, it.finish)} ${shapeLabel(it.shape)} ${sizeText(it)} × ${it.qty}${it.freeQty ? ` (+แถม ${it.freeQty})` : ""}${it.check ? ` [${it.check.title}]` : ""}`)
+    .map((it, i) => `${i + 1}. ${it.up.file_name} — ${productLabel(it.product, it.finish)} ${shapeLabel(it.shape)} ${sizeText(it)} × ${it.qty}${it.freeQty ? ` (+แถม ${it.freeQty})` : ""}${it.trim ? " [ตัดพื้นหลังรอบงาน]" : ""}${it.check ? ` [${it.check.title}]` : ""}`)
     .join("\n");
   await notifyShop(
     settings.notifyEmail,

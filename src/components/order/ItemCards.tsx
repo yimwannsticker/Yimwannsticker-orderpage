@@ -1,23 +1,95 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { PP_FINISHES, PRODUCTS, SHAPES } from "@/lib/constants";
 import { baht, fileSizeText } from "@/lib/format";
 import type { ItemField, QuoteLine } from "@/lib/pricing";
-import { applySize, cm, fileAspect, itemCheck, maxSharpText, perSheet } from "@/lib/sticker-size";
+import { detectTrim, type TrimSuggestion } from "@/lib/client/trim";
+import { applySize, cm, fileAspect, itemCheck, maxSharpText, perSheet, trimCheck } from "@/lib/sticker-size";
 import type { CheckResult, DraftItem, ProductKey, PublicSettings, Shape } from "@/lib/types";
 import { CheckBadge, CheckDetails, FileIcon, NumberStepper, Spinner } from "../ui";
 import { INVALID_INPUT } from "./AddressForm";
+import { ArtworkViewer, CHECKER, useTrimmed } from "./ArtworkViewer";
 
 function Thumb({ item, size = "h-20 w-20" }: { item: DraftItem; size?: string }) {
-  return (
-    <div className={`${size} shrink-0 overflow-hidden rounded-2xl border border-line bg-gray-50`}>
-      {item.previewUrl ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img src={item.previewUrl} alt={`ตัวอย่าง ${item.fileName}`} className="h-full w-full object-contain" />
-      ) : (
+  const [open, setOpen] = useState(false);
+  const trimmed = useTrimmed(item.previewUrl, item.trim);
+  const src = item.trim ? trimmed : item.previewUrl;
+  if (!item.previewUrl)
+    return (
+      <div className={`${size} shrink-0 overflow-hidden rounded-2xl border border-line bg-gray-50`}>
         <FileIcon ext={item.fileType} />
-      )}
+      </div>
+    );
+  return (
+    <>
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        aria-label={`ดู ${item.fileName} แบบเต็มจอ`}
+        className={`${size} relative shrink-0 overflow-hidden rounded-2xl border border-line bg-gray-50`}
+        style={item.trim ? CHECKER : undefined}
+      >
+        {src && (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={src} alt={`ตัวอย่าง ${item.fileName}`} className="h-full w-full object-contain" />
+        )}
+        <span className="absolute bottom-1 right-1 flex h-7 w-7 items-center justify-center rounded-full bg-black/60 text-white" aria-hidden>
+          <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+            <circle cx="11" cy="11" r="6" />
+            <path d="m20 20-4.5-4.5M11 8.5v5M8.5 11h5" />
+          </svg>
+        </span>
+      </button>
+      {open && <ArtworkViewer url={item.previewUrl} fileName={item.fileName} trim={item.trim} onClose={() => setOpen(false)} />}
+    </>
+  );
+}
+
+/** เสนอให้ตัดพื้นหลังสีพื้นรอบงาน (ลูกค้าไม่ได้ตั้งหน้ากระดาษตามขนาดงาน) */
+function TrimOption({
+  item,
+  onToggle,
+}: {
+  item: DraftItem;
+  onToggle: (trim: DraftItem["trim"]) => void;
+}) {
+  const [found, setFound] = useState<{ url: string; s: TrimSuggestion | null } | null>(null);
+  const [view, setView] = useState(false);
+  const url = item.status === "done" ? item.previewUrl : null;
+  useEffect(() => {
+    if (!url) return;
+    let alive = true;
+    detectTrim(url).then((s) => alive && setFound({ url, s }));
+    return () => {
+      alive = false;
+    };
+  }, [url]);
+  const s = found?.url === url ? found.s : null;
+  const t = item.trim ?? (s ? { x: s.x, y: s.y, w: s.w, h: s.h, color: s.color } : null);
+  if (!url || !t) return null;
+  const label = s?.label ?? (t.color === "transparent" ? "โปร่งใส" : "สีพื้น");
+  const what = label === "โปร่งใส" ? "พื้นที่โปร่งใส" : `พื้นหลัง${label}`;
+  const pct = Math.round((1 - t.w * t.h) * 100);
+  return (
+    <div className={`rounded-xl border p-3 text-sm ${item.trim ? "border-brand-200 bg-brand-50" : "border-amber-200 bg-amber-50"}`}>
+      <p className="font-semibold">
+        ✂️ พบ{what}รอบงาน (ประมาณ {pct}% ของไฟล์)
+      </p>
+      <p className="mt-0.5 text-muted">ถ้าส่วนนี้ไม่ได้ต้องการพิมพ์ ตัดออกได้ ระบบจะคิดขนาด สัดส่วน และความคมชัดจากตัวงานจริง</p>
+      <label className="mt-2 flex items-center gap-2 font-medium">
+        <input
+          type="checkbox"
+          className="h-5 w-5 accent-brand-500"
+          checked={Boolean(item.trim)}
+          onChange={(e) => onToggle(e.target.checked ? t : null)}
+        />
+        ตัด{what}รอบงานออก
+      </label>
+      <button type="button" className="mt-2 text-sm font-semibold text-brand-600 underline" onClick={() => setView(true)}>
+        🔍 ดูแบบเต็มจอ ว่าตัดถูกต้อง
+      </button>
+      {view && <ArtworkViewer url={url} fileName={item.fileName} trim={t} onClose={() => setView(false)} />}
     </div>
   );
 }
@@ -240,12 +312,22 @@ function SizePicker({
   onChange: (p: Partial<DraftItem>) => void;
 }) {
   const badSize = problem?.field === "size";
-  const aspect = fileAspect(item.check);
+  const used = trimCheck(item.check, item.trim);
+  const aspect = fileAspect(used);
   const [lock, setLock] = useState(Boolean(aspect));
   const circle = item.shape === "circle";
   const count = item.widthMm && item.heightMm ? perSheet(item.widthMm, item.heightMm, settings, item.shape) : 0;
   const [want, setWant] = useState("");
-  const sharp = maxSharpText(item.check, settings);
+  const sharp = maxSharpText(used, settings);
+
+  // เปิด/ปิดตัดพื้นหลัง → สัดส่วนงานเปลี่ยน ปรับความยาวตามถ้าล็อกสัดส่วนไว้
+  const toggleTrim = (trim: DraftItem["trim"]) => {
+    const a = fileAspect(trimCheck(item.check, trim));
+    onChange({
+      trim,
+      ...(lock && a && item.widthMm && item.shape !== "circle" ? { heightMm: Math.round(item.widthMm / a) } : {}),
+    });
+  };
 
   const setW = (w: number | null) =>
     onChange(circle ? { widthMm: w, heightMm: w } : { widthMm: w, ...(lock && aspect && w ? { heightMm: Math.round(w / aspect) } : {}) });
@@ -283,6 +365,8 @@ function SizePicker({
           <p className="mt-1 text-xs text-muted">แนะนำไฟล์ PNG พื้นหลังโปร่งใส หรือไฟล์ AI/PDF ที่มีเส้นไดคัท (ถ้าไม่มี กราฟิกจะทำเส้นตัดให้)</p>
         )}
       </Invalid>
+
+      <TrimOption item={item} onToggle={toggleTrim} />
 
       {item.shape && (
         <div className="space-y-2">

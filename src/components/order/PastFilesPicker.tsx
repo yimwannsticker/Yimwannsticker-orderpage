@@ -21,6 +21,7 @@ export interface PastFile {
   shape: DraftItem["shape"];
   widthMm: number | null;
   heightMm: number | null;
+  trim: DraftItem["trim"];
   orderNo: string;
   date: string;
   times: number;

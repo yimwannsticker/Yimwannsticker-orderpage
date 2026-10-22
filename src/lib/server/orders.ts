@@ -1,7 +1,7 @@
 import "server-only";
 import { db } from "../supabase/admin";
 import * as storage from "./storage";
-import type { Address, CheckResult, Finish, OrderStatus, ProductKey, Shape } from "../types";
+import type { Address, CheckResult, Finish, OrderStatus, ProductKey, Shape, Trim } from "../types";
 import { pushTracking, messagingEnabled } from "./line";
 import { siteUrl } from "./email";
 import { getSettings } from "./settings";
@@ -65,6 +65,7 @@ export interface ItemRow {
   reorder_of: string | null;
   shape: Shape | null;
   width_mm: number | null;
+  trim: Trim | null;
   height_mm: number | null;
   per_sheet: number | null;
 }

@@ -32,6 +32,9 @@ export interface CheckResult {
     missingLinks?: string[];
     minImageDpi?: number;
     hasAlpha?: boolean;
+    /** ขนาดไฟล์เต็มก่อนตัดพื้นหลัง (มีเฉพาะเมื่อลูกค้าเลือกตัด) */
+    fullWidthPx?: number;
+    fullHeightPx?: number;
     needsManualReview?: boolean;
   };
   checkedBy: "browser" | "server";
@@ -98,6 +101,16 @@ export interface Address {
   zipcode: string;
 }
 
+/** ตัดพื้นหลังรอบงาน: กรอบส่วนงานจริงเป็นสัดส่วน 0–1 ของไฟล์ */
+export interface Trim {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  /** สีพื้นหลังที่ตัด (#rrggbb) หรือ "transparent" */
+  color: string;
+}
+
 export interface DraftItem {
   /** id ภายใน browser */
   key: string;
@@ -120,6 +133,8 @@ export interface DraftItem {
   heightMm: number | null;
   acceptRisk: boolean;
   fixService: boolean;
+  /** ลูกค้าเลือกตัดพื้นหลังรอบงาน (ใช้เฉพาะส่วนงานคิดขนาด/สัดส่วน/DPI) */
+  trim?: Trim | null;
   /** สั่งซ้ำ: ใช้ไฟล์จากออเดอร์เดิม ไม่ต้องอัปโหลดใหม่ */
   source?: {
     /** มาจากปุ่มสั่งซ้ำในหน้าเช็คสถานะ */
