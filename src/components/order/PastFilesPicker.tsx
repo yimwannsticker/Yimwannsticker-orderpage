@@ -32,12 +32,15 @@ export interface PastFile {
 export function PastFilesPicker({
   initialName,
   initialPhone,
+  preloaded,
   inCart,
   onAdd,
   onClose,
 }: {
   initialName: string;
   initialPhone: string;
+  /** ลูกค้าที่เครื่องนี้จำไว้: ข้ามขั้นยืนยัน แสดงไฟล์เลย */
+  preloaded?: { customer: { name: string; phone: string }; files: PastFile[] } | null;
   /** itemId ที่อยู่ในตะกร้าแล้ว */
   inCart: Set<string>;
   onAdd: (files: PastFile[], customer: { name: string; phone: string }) => void;
@@ -47,7 +50,9 @@ export function PastFilesPicker({
   const [phone, setPhone] = useState(initialPhone);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [data, setData] = useState<{ customer: { name: string; phone: string }; files: PastFile[] } | null>(null);
+  const [data, setData] = useState<{ customer: { name: string; phone: string }; files: PastFile[] } | null>(
+    preloaded ?? null,
+  );
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [query, setQuery] = useState("");
 

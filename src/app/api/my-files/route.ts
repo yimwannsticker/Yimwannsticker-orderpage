@@ -3,7 +3,8 @@ import { fileExt } from "@/lib/constants";
 import { bad, readJson } from "@/lib/server/http";
 import { signedUrls, type ItemRow } from "@/lib/server/orders";
 import { sign, type FileGrant } from "@/lib/server/signed-cookie";
-import { verifyCustomer } from "@/lib/server/customer-lookup";
+import { resolveCustomer } from "@/lib/server/customer-lookup";
+import { rememberMe } from "@/lib/server/me";
 
 const GRANT_DAYS = 7;
 
@@ -12,7 +13,7 @@ const GRANT_DAYS = 7;
  * แสดงแค่รูปตัวอย่าง ไม่ให้ดาวน์โหลดไฟล์ต้นฉบับ
  */
 export async function POST(req: Request) {
-  const v = await verifyCustomer(req, await readJson<{ name: string; phone: string }>(req));
+  const v = await resolveCustomer(req, await readJson<{ name: string; phone: string }>(req));
   if (!v.ok) return bad(v.error, v.status);
   const { phone, orders } = v;
 
@@ -30,8 +31,8 @@ export async function POST(req: Request) {
   const previews = await signedUrls(list.map((f) => f.item.preview_path), 60 * 60 * 24);
   const exp = Date.now() + GRANT_DAYS * 86400_000;
 
-  return NextResponse.json({
-    customer: { name: orders[0].customer_name, phone },
+  const res = NextResponse.json({
+    customer: { name: v.fullName, phone },
     files: list.map(({ item, orderNo, date, times }) => ({
       grant: sign({ i: item.id, p: phone, exp } satisfies FileGrant),
       itemId: item.id,
@@ -53,4 +54,5 @@ export async function POST(req: Request) {
       prevFixed: item.fix_service,
     })),
   });
+  return rememberMe(res, phone, v.fullName);
 }

@@ -15,6 +15,7 @@ import { LineLoginCard } from "./LineLoginCard";
 import { PastFilesPicker, type PastFile } from "./PastFilesPicker";
 import { PaymentInfo, SlipUploader } from "./PaymentBox";
 import { useArtworkUploader } from "./useArtworkUploader";
+import { WelcomeBack, type Me } from "./WelcomeBack";
 
 const STEPS = ["อัปโหลดไฟล์", "เลือกสติกเกอร์", "ที่อยู่จัดส่ง", "สรุปและชำระเงิน"];
 const STEP_KEYS = ["upload", "items", "address", "summary"];
@@ -157,6 +158,47 @@ export function OrderWizard({ settings }: { settings: PublicSettings }) {
   );
   const remove = (key: string) => setItems((xs) => xs.filter((x) => x.key !== key));
   const [picker, setPicker] = useState(false);
+
+  // ลูกค้าที่เครื่องนี้จำไว้: ทักทาย ยอดสะสม ไฟล์เดิม และกรอกชื่อ/เบอร์/ที่อยู่ล่าสุดให้
+  const [me, setMe] = useState<Me | null>(null);
+  const [myFiles, setMyFiles] = useState<{ customer: { name: string; phone: string }; files: PastFile[] } | null>(null);
+  useEffect(() => {
+    let alive = true;
+    const post = (url: string) => fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" });
+    fetch("/api/me")
+      .then((r) => r.json())
+      .then(async ({ me }: { me: Me | null }) => {
+        if (!alive || !me) return;
+        setMe(me);
+        const [files, addrs] = await Promise.all([
+          post("/api/my-files").then((r) => (r.ok ? r.json() : { customer: me, files: [] })),
+          post("/api/my-addresses").then((r) => (r.ok ? r.json() : { addresses: [] })),
+        ]);
+        if (!alive) return;
+        setMyFiles(files);
+        const latest = (addrs.addresses as { address: CustomerForm["address"] }[])[0]?.address;
+        setCustomer((c) => {
+          if (c.name.trim() || c.phone.trim()) return c;
+          const empty = !c.address.line1.trim() && !c.address.zipcode;
+          return { ...c, name: me.name, phone: me.phone, address: empty && latest ? { ...latest } : c.address };
+        });
+      })
+      .catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  async function logout() {
+    await fetch("/api/me", { method: "DELETE" }).catch(() => {});
+    setMe(null);
+    setMyFiles(null);
+    setCustomer(EMPTY_CUSTOMER);
+    // ไฟล์เดิมผูกกับเบอร์ของลูกค้าคนนั้น เอาออกด้วย
+    setItems((xs) => xs.filter((x) => !x.source?.grant));
+    setNotice("ออกจากระบบแล้ว เครื่องนี้จะไม่จำข้อมูลของคุณ");
+  }
+
   function addPastFiles(files: PastFile[], who: { name: string; phone: string }) {
     setItems((xs) => [
       ...xs,
@@ -187,6 +229,8 @@ export function OrderWizard({ settings }: { settings: PublicSettings }) {
     setCustomer((c) => ({ ...c, name: c.name || who.name, phone: c.phone || who.phone }));
     setPicker(false);
     setNotice(`เพิ่มไฟล์ที่เคยสั่ง ${files.length} ไฟล์แล้ว ใช้ประเภทและจำนวนจากครั้งล่าสุด แก้ได้ในขั้นถัดไป`);
+    // ยืนยันผ่านหน้าเลือกไฟล์แล้ว → เครื่องนี้จำลูกค้าไว้ (ทักทายครั้งหน้า)
+    if (!me) fetch("/api/me").then((r) => r.json()).then((d) => d.me && setMe(d.me)).catch(() => {});
   }
   const addFiles = useArtworkUploader(settings, add, update);
   const onFiles = (files: FileList) => {
@@ -221,6 +265,7 @@ export function OrderWizard({ settings }: { settings: PublicSettings }) {
   const setFree = (key: string, qty: number) =>
     setFreeAlloc(Object.fromEntries(withFree.map((i) => [i.key, i.key === key ? qty : i.freeQty])));
 
+  const inCart = new Set(items.map((i) => i.source?.itemId).filter(Boolean) as string[]);
   const busy = items.some((i) => i.status === "uploading" || i.status === "checking");
   const doneItems = items.filter((i) => i.status === "done");
 
@@ -356,7 +401,8 @@ export function OrderWizard({ settings }: { settings: PublicSettings }) {
       <PastFilesPicker
         initialName={customer.name}
         initialPhone={customer.phone}
-        inCart={new Set(items.map((i) => i.source?.itemId).filter(Boolean) as string[])}
+        preloaded={myFiles}
+        inCart={inCart}
         onAdd={addPastFiles}
         onClose={() => setPicker(false)}
       />
@@ -386,6 +432,17 @@ export function OrderWizard({ settings }: { settings: PublicSettings }) {
 
       {step === 0 && (
         <section className="space-y-3">
+          {me && (
+            <WelcomeBack
+              me={me}
+              promo={settings.promo}
+              files={myFiles?.files ?? null}
+              inCart={inCart}
+              onAdd={(f) => addPastFiles([f], myFiles?.customer ?? me)}
+              onShowAll={() => setPicker(true)}
+              onLogout={logout}
+            />
+          )}
           <h1 className="text-xl font-bold">อัปโหลดไฟล์งาน</h1>
           <Dropzone onFiles={onFiles} maxMb={settings.maxFileMb} />
           <button type="button" className="btn-secondary w-full" onClick={() => setPicker(true)}>
@@ -493,7 +550,8 @@ export function OrderWizard({ settings }: { settings: PublicSettings }) {
           <label className="flex cursor-pointer items-start gap-3 px-1 text-sm">
             <input type="checkbox" className="mt-0.5 h-5 w-5 accent-brand-500" checked={consent} onChange={(e) => setConsent(e.target.checked)} />
             <span>
-              ยินยอมให้ร้านเก็บและใช้ชื่อ เบอร์โทร ที่อยู่ และไฟล์งาน เพื่อผลิตและจัดส่งสินค้า ตาม{" "}
+              ยินยอมให้ร้านเก็บและใช้ชื่อ เบอร์โทร ที่อยู่ และไฟล์งาน เพื่อผลิตและจัดส่งสินค้า และให้เครื่องนี้จำข้อมูลไว้สั่งครั้งต่อไป
+              (ออกจากระบบได้ทุกเมื่อ) ตาม{" "}
               <Link href="/privacy" target="_blank" className="font-medium text-brand-600 underline">
                 นโยบายความเป็นส่วนตัว
               </Link>

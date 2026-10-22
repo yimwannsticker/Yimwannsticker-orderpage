@@ -43,3 +43,14 @@ export interface FileGrant {
   p: string;
   exp: number;
 }
+
+/** ลูกค้าที่ยืนยันชื่อ + เบอร์ หรือสั่งจากเครื่องนี้แล้ว (จำไว้ให้ครั้งต่อไป) */
+export const ME_COOKIE = "yw_me";
+export const ME_DAYS = 90;
+export interface MeSession {
+  /** เบอร์โทร */
+  p: string;
+  /** ชื่อผู้รับล่าสุด */
+  n: string;
+  exp: number;
+}

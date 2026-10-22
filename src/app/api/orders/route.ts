@@ -9,6 +9,7 @@ import { notifyShop, siteUrl } from "@/lib/server/email";
 import { bad, readJson } from "@/lib/server/http";
 import { getOrCreateCustomer, getPoints } from "@/lib/server/orders";
 import { getSettings } from "@/lib/server/settings";
+import { rememberMe } from "@/lib/server/me";
 import { LINE_COOKIE, verify, type FileGrant, type LineSession } from "@/lib/server/signed-cookie";
 import { verifySlip } from "@/lib/server/slip";
 import * as storage from "@/lib/server/storage";
@@ -231,7 +232,7 @@ export async function POST(req: Request) {
     `ออเดอร์ใหม่ ${order.order_no}\nลูกค้า: ${name} ${phone}\nที่อยู่: ${formatAddress(address)}\n\n${lines}\n\nรวม ${quote.totalSheets} แผ่น แถม ${quote.freeSheets} แผ่น\nยอดชำระ ${baht(quote.total)}\n\nดูออเดอร์: ${siteUrl()}/admin/orders/${order.id}`,
   );
 
-  return NextResponse.json({ orderNo: order.order_no, token: order.token });
+  return rememberMe(NextResponse.json({ orderNo: order.order_no, token: order.token }), phone, name);
 }
 
 type UploadLike = { path: string; file_name: string; size: number; kind: string; used: boolean; check_result: unknown };
