@@ -6,6 +6,7 @@ import { CARRIERS, resolveCarrier } from "@/lib/constants";
 import * as storage from "@/lib/server/storage";
 import { normalizePhone } from "@/lib/format";
 import { requireStaff, type Role } from "@/lib/server/auth";
+import { parseMessageLines } from "@/lib/greeting";
 import { mergeSettings, saveSettings } from "@/lib/server/settings";
 import { markShipped, removeIfUnreferenced } from "@/lib/server/orders";
 import { db } from "@/lib/supabase/admin";
@@ -255,6 +256,8 @@ export async function updateSettings(data: Settings): Promise<Result> {
     return { ok: false, error: "ตารางราคาไม่ถูกต้อง" };
   if (new Set(s.tiers.map((t) => t.min)).size !== s.tiers.length) return { ok: false, error: "ช่วงจำนวนในตารางราคาซ้ำกัน" };
   s.tiers = [...s.tiers].sort((a, b) => a.min - b.min);
+  s.welcomeMessages = parseMessageLines((s.welcomeMessages ?? []).join("\n"));
+  s.thankYouMessages = parseMessageLines((s.thankYouMessages ?? []).join("\n"));
   if (s.maxFileMb > 200) return { ok: false, error: "ขนาดไฟล์สูงสุด 200MB (ตามที่ตั้ง bucket ไว้)" };
   await saveSettings(s);
   revalidatePath("/", "layout");

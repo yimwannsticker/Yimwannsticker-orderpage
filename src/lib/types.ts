@@ -79,6 +79,10 @@ export interface Settings {
   slipVerify: { enabled: boolean; provider: "slipok" | "easyslip" };
   notifyEmail: string;
   contactLine: string;
+  /** ข้อความทักทายลูกค้าเก่าแบบสุ่ม ({n} = ชื่อลูกค้า) */
+  welcomeMessages: string[];
+  /** ข้อความขอบคุณ/อวยพรหน้าสั่งเสร็จแบบสุ่ม ({n} = ชื่อลูกค้า) */
+  thankYouMessages: string[];
 }
 
 /** ส่วนที่ส่งให้ฝั่งลูกค้าได้ (ไม่มีข้อมูลภายใน) */

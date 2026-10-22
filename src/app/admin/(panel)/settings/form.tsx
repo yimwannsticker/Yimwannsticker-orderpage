@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { Spinner } from "@/components/ui";
+import { parseMessageLines } from "@/lib/greeting";
 import type { PriceTier, Settings } from "@/lib/types";
 import { updateSettings } from "../../actions";
 import { ResultNote } from "../ui";
@@ -48,6 +49,27 @@ function Text({ label, value, onChange, hint, multiline }: { label: string; valu
         <input className="input" value={value} onChange={(e) => onChange(e.target.value)} />
       )}
       {hint && <span className="mt-1 block text-xs text-muted">{hint}</span>}
+    </label>
+  );
+}
+
+/** รายการข้อความ แก้เป็นข้อความหลายบรรทัด (1 บรรทัด = 1 ข้อความ) */
+function Lines({ label, value, onChange, hint }: { label: string; value: string[]; onChange: (v: string[]) => void; hint?: string }) {
+  const [text, setText] = useState(value.join("\n"));
+  return (
+    <label className="block">
+      <span className="label">{label}</span>
+      <textarea
+        className="input min-h-56 py-2 leading-relaxed"
+        value={text}
+        onChange={(e) => {
+          setText(e.target.value);
+          onChange(parseMessageLines(e.target.value));
+        }}
+      />
+      <span className="mt-1 block text-xs text-muted">
+        {value.length} ข้อความ{hint ? ` · ${hint}` : ""}
+      </span>
     </label>
   );
 }
@@ -215,6 +237,15 @@ export function SettingsForm({
         <p className="text-xs text-muted">
           LINE Login: {env.lineLogin ? "✅ พร้อม" : "❌ ยังไม่ได้ตั้งค่า"} · LINE Messaging API: {env.lineMessaging ? "✅ พร้อม" : "❌ ยังไม่ได้ตั้งค่า"}
         </p>
+      </Section>
+
+      <Section title="ข้อความแบบสุ่ม">
+        <p className="text-sm text-muted">
+          พิมพ์ 1 บรรทัดต่อ 1 ข้อความ ระบบสุ่มขึ้นทีละข้อความ ใส่ {"{n}"} ตรงไหน จะแทนด้วยชื่อลูกค้า (เช่น คุณ{"{n}"} → คุณสมหญิง)
+          ลบหมดทุกบรรทัด = ไม่แสดงข้อความ · บันทึกแล้วขึ้นหน้าเว็บทันที
+        </p>
+        <Lines label="ทักทายลูกค้าเก่า (หน้าสั่งพิมพ์)" value={s.welcomeMessages} onChange={(v) => set("welcomeMessages", v)} />
+        <Lines label="ขอบคุณ / อวยพร (หน้าสั่งเสร็จ)" value={s.thankYouMessages} onChange={(v) => set("thankYouMessages", v)} />
       </Section>
 
       <Section title="ร้าน">

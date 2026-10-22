@@ -246,7 +246,7 @@ export function AddressForm({
                 aria-checked={on}
                 onClick={() => onChange({ ...value, address: { ...s.address } })}
                 className={`flex w-full items-start gap-3 rounded-2xl border-2 p-3 text-left transition ${
-                  on ? "border-brand-500 bg-brand-50" : "border-gray-200 bg-white hover:border-brand-300"
+                  on ? "border-brand-500 bg-brand-50" : "border-gray-200 bg-white hover:border-brand-200"
                 }`}
               >
                 <span

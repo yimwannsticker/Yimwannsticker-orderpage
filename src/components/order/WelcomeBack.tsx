@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { pickMessage } from "@/lib/greeting";
 import { toNextFree } from "@/lib/pricing";
 import type { PublicSettings } from "@/lib/types";
 import { FileIcon } from "../ui";
@@ -13,18 +14,6 @@ export interface Me {
   pending: number;
 }
 
-/** แก้/เพิ่มข้อความทักทายได้ที่นี่ ({n} = ชื่อลูกค้า) */
-const GREETINGS = [
-  "ยินดีต้อนรับกลับค่ะ คุณ{n} 💕",
-  "สวัสดีค่ะ วันนี้มีงานอะไรให้ทางร้านบริการคะ คุณ{n} 💖",
-  "คุณ{n} กลับมาแล้ว! วันนี้ให้ยิ้มหวานสติกเกอร์ผลิตอะไรดีคะ ✨",
-  "สวัสดีค่ะ คุณ{n} ขอบคุณที่กลับมาอุดหนุนนะคะ 🙏",
-  "สวัสดีค่ะ คุณ{n} วันนี้สั่งแบบไหนดีคะ 😊",
-  "คุณ{n}กลับมาแล้ว 🌷 ยิ้มหวานสติกเกอร์ยินดีให้บริการค่ะ",
-];
-
-const PREFIX = /^(คุณ|นางสาว|นาง|นาย|น\.ส\.)\s*/;
-const firstName = (s: string) => s.trim().replace(PREFIX, "").split(/\s+/)[0] || s;
 const maskPhone = (p: string) => (p.length === 10 ? `${p.slice(0, 3)}-xxx-${p.slice(6)}` : p);
 
 const SHOW_FILES = 4;
@@ -32,6 +21,7 @@ const SHOW_FILES = 4;
 export function WelcomeBack({
   me,
   promo,
+  messages,
   files,
   inCart,
   onAdd,
@@ -40,6 +30,8 @@ export function WelcomeBack({
 }: {
   me: Me;
   promo: PublicSettings["promo"];
+  /** ข้อความทักทายแบบสุ่มจากหลังบ้าน */
+  messages: string[];
   /** null = กำลังโหลด */
   files: PastFile[] | null;
   inCart: Set<string>;
@@ -47,14 +39,14 @@ export function WelcomeBack({
   onShowAll: () => void;
   onLogout: () => void;
 }) {
-  const [greeting] = useState(() => GREETINGS[Math.floor(Math.random() * GREETINGS.length)]);
+  const [greeting] = useState(() => pickMessage(messages, me.name));
   const total = me.points + me.pending;
   const need = toNextFree(promo, total);
 
   return (
     <div className="card space-y-3 border-brand-200 bg-gradient-to-br from-brand-50 to-white">
       <div>
-        <p className="text-lg font-bold">{greeting.replace("{n}", firstName(me.name))}</p>
+        {greeting && <p className="text-lg font-bold">{greeting}</p>}
         <p className="mt-1 text-sm">
           ยอดสะสม <b>{me.points}</b> แผ่น
           {me.pending > 0 && <span className="text-muted"> (+{me.pending} รอตรวจสลิป)</span>}

@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { productLabel, shapeLabel } from "@/lib/constants";
 import { itemCheck, perSheet, sizeText } from "@/lib/sticker-size";
 import { baht, isValidPhone, normalizePhone } from "@/lib/format";
+import { pickMessage } from "@/lib/greeting";
 import { computeQuote, defaultFreeAllocation, itemProblem, nudgeText, validateItems } from "@/lib/pricing";
 import type { DraftItem, PublicSettings } from "@/lib/types";
 import { Alert, CopyButton, NumberStepper, Spinner, Stepper } from "../ui";
@@ -408,7 +409,16 @@ export function OrderWizard({ settings }: { settings: PublicSettings }) {
       />
     );
 
-  if (done) return <DoneScreen orderNo={done.orderNo} token={done.token} contactLine={settings.contactLine} />;
+  if (done)
+    return (
+      <DoneScreen
+        orderNo={done.orderNo}
+        token={done.token}
+        contactLine={settings.contactLine}
+        messages={settings.thankYouMessages}
+        name={customer.name}
+      />
+    );
 
   return (
     <div ref={topRef} className="mx-auto max-w-xl scroll-mt-4 px-4 pb-40 pt-4">
@@ -436,6 +446,7 @@ export function OrderWizard({ settings }: { settings: PublicSettings }) {
             <WelcomeBack
               me={me}
               promo={settings.promo}
+              messages={settings.welcomeMessages}
               files={myFiles?.files ?? null}
               inCart={inCart}
               onAdd={(f) => addPastFiles([f], myFiles?.customer ?? me)}
@@ -714,13 +725,31 @@ function PromoBox(props: {
   );
 }
 
-function DoneScreen({ orderNo, token, contactLine }: { orderNo: string; token: string; contactLine: string }) {
+function DoneScreen({
+  orderNo,
+  token,
+  contactLine,
+  messages,
+  name,
+}: {
+  orderNo: string;
+  token: string;
+  contactLine: string;
+  messages: string[];
+  name: string;
+}) {
+  const [blessing] = useState(() => pickMessage(messages, name));
   const url = typeof window !== "undefined" ? `${window.location.origin}/o/${token}` : `/o/${token}`;
   return (
     <div className="mx-auto max-w-xl px-4 py-10 text-center">
       <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-ok-bg text-4xl text-ok">✓</div>
       <h1 className="mt-4 text-2xl font-bold">ส่งออเดอร์เรียบร้อย</h1>
       <p className="mt-1 text-muted">ร้านจะตรวจสลิปและเริ่มผลิตให้เร็วที่สุด</p>
+      {blessing && (
+        <p className="mx-auto mt-4 max-w-md rounded-2xl bg-gradient-to-br from-brand-50 to-amber-50 px-4 py-3 text-lg font-semibold text-brand-700">
+          {blessing}
+        </p>
+      )}
       <div className="card mt-6 space-y-3 text-left">
         <div>
           <p className="text-sm text-muted">เลขออเดอร์</p>
