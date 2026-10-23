@@ -262,7 +262,7 @@ export function CategoryManager({ initial, counts }: { initial: Cat[]; counts: R
   );
 }
 
-// ---------- นักออกแบบ ----------
+// ---------- กราฟิก ----------
 
 export function DesignerManager({ initial, counts }: { initial: { id: string; name: string; active: boolean }[]; counts: Record<string, number> }) {
   const [list, setList] = useState(initial);
@@ -271,7 +271,7 @@ export function DesignerManager({ initial, counts }: { initial: { id: string; na
   return (
     <div className="space-y-3">
       <div className="card flex gap-2">
-        <input className="input" placeholder="ชื่อนักออกแบบ" value={name} onChange={(e) => setName(e.target.value)} />
+        <input className="input" placeholder="ชื่อกราฟิก" value={name} onChange={(e) => setName(e.target.value)} />
         <button
           type="button"
           className="btn-primary shrink-0"

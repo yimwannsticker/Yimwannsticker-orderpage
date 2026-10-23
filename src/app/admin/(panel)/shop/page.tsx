@@ -9,7 +9,7 @@ export const dynamic = "force-dynamic";
 const TABS = [
   { key: "products", label: "สินค้า" },
   { key: "categories", label: "หมวดหมู่" },
-  { key: "designers", label: "นักออกแบบ" },
+  { key: "designers", label: "กราฟิก" },
 ];
 
 export default async function ShopAdminPage({ searchParams }: { searchParams: Promise<{ tab?: string }> }) {

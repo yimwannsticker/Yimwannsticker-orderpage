@@ -201,7 +201,7 @@ export function ProductEditor({
               ))}
             </select>
           </Field>
-          <Field label="นักออกแบบ">
+          <Field label="กราฟิก">
             <select className="input" value={p.designerId ?? ""} onChange={(e) => set("designerId", e.target.value || null)}>
               <option value="">ไม่ระบุ</option>
               {designers

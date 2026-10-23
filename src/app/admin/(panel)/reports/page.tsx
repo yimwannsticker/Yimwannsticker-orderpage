@@ -46,18 +46,18 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
       </div>
 
       <Table
-        title={`ต่อนักออกแบบ · ${monthLabel}`}
-        head={["นักออกแบบ", "แผ่น", "ยอดขาย", "สินค้าที่ขายได้"]}
+        title={`ต่อกราฟิก · ${monthLabel}`}
+        head={["กราฟิก", "แผ่น", "ยอดขาย", "สินค้าที่ขายได้"]}
         rows={r.byDesigner.map((x) => [x.designer, n(x.sheets), baht(x.revenue), n(x.products)])}
       />
       <Table
         title="ต่อสินค้า"
-        head={["สินค้า", "นักออกแบบ", "แผ่น", "ยอดขาย", "ออเดอร์"]}
+        head={["สินค้า", "กราฟิก", "แผ่น", "ยอดขาย", "ออเดอร์"]}
         rows={r.byProduct.map((x) => [x.product, x.designer, n(x.sheets), baht(x.revenue), n(x.orders)])}
       />
       <Table
         title="ต่อลาย"
-        head={["SKU", "สินค้า / ลาย", "นักออกแบบ", "แผ่น", "ยอดขาย"]}
+        head={["SKU", "สินค้า / ลาย", "กราฟิก", "แผ่น", "ยอดขาย"]}
         rows={r.byDesign.map((x) => [x.sku, `${x.product} · ${x.design}${x.size ? ` · ${x.size}` : ""}`, x.designer, n(x.sheets), baht(x.revenue)])}
       />
     </div>

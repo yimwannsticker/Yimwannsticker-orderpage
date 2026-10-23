@@ -36,7 +36,7 @@ type Row = {
   line_total: number;
 };
 
-/** ยอดขายสติกเกอร์สำเร็จรูป A5 รายเดือน: ต่อสินค้า ต่อลาย ต่อนักออกแบบ (ใช้คิดค่าคอมมิชชั่น) */
+/** ยอดขายสติกเกอร์สำเร็จรูป A5 รายเดือน: ต่อสินค้า ต่อลาย ต่อกราฟิก (ใช้คิดค่าคอมมิชชั่น) */
 export async function getA5Report(month: string): Promise<A5Report> {
   const { start, end } = monthRange(month);
   const rows: Row[] = [];

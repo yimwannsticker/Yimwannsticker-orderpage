@@ -63,12 +63,12 @@ export async function reorderProducts(ids: string[]): Promise<Result> {
   return { ok: true };
 }
 
-// ---------- นักออกแบบ ----------
+// ---------- กราฟิก ----------
 
 export async function saveDesigner(input: { id?: string; name: string; active: boolean }): Promise<Result> {
   await requireStaff("admin");
   const name = clean(input.name, 80);
-  if (!name) return { ok: false, error: "กรุณาใส่ชื่อนักออกแบบ" };
+  if (!name) return { ok: false, error: "กรุณาใส่ชื่อกราฟิก" };
   const row = { name, active: Boolean(input.active) };
   const { error } = input.id
     ? await db().from("designers").update(row).eq("id", input.id)
