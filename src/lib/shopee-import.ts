@@ -1,5 +1,5 @@
 /**
- * แปลงไฟล์ export จาก Shopee (media_info, sales_info และ basic_info ถ้ามี) เป็นสินค้าในร้าน
+ * แปลงไฟล์ export จาก Shopee (media_info และ sales_info) เป็นสินค้าในร้าน
  * - ไม่นำเข้าตัวเลือกที่มีคำว่า "ตำหนิ" สินค้าลดล้างสต็อค งานศพ และงานเคลือบ
  * - การ์ด (ตัวเลือก "แพ็ค N ใบ") เป็นสินค้าราคาคงที่ ใช้ราคาเดียวกับ Shopee
  * - สินค้าอื่นใช้ราคาขั้นบันได A5 ส่วนต่างตามขนาดคิดจากสัดส่วนราคาใน Shopee
@@ -52,13 +52,12 @@ export function tableOf(rows: string[][]): Table {
     .map((r) => Object.fromEntries(head.map((h, i) => [h, String(r[i] ?? "").trim()])));
 }
 
-/** ประเภทไฟล์จากแถวที่ 2 (Shopee ใส่ media_info / sales_info / basic_info) หรือจากคอลัมน์ */
-export function shopeeFileKind(rows: string[][]): "media" | "sales" | "basic" | null {
+/** ประเภทไฟล์จากแถวที่ 2 (Shopee ใส่ media_info / sales_info) หรือจากคอลัมน์ */
+export function shopeeFileKind(rows: string[][]): "media" | "sales" | null {
   const head = rows[0] ?? [];
   const tag = (rows[1] ?? [])[0] ?? "";
   if (tag === "media_info" || head.includes("ps_item_cover_image")) return "media";
   if (tag === "sales_info" || head.includes("et_title_variation_price")) return "sales";
-  if (tag === "basic_info" || head.some((h) => /description/i.test(h))) return "basic";
   return null;
 }
 
@@ -98,16 +97,20 @@ const mode = <T>(list: T[]) => {
   return [...c.entries()].sort((a, b) => b[1] - a[1])[0]?.[0];
 };
 
+/** ขนาดจากชื่อสินค้า เช่น "(2x2ซม.)" / "ขนาด 9 x 5.5 ซม." → "2x2 ซม." */
+export function sizeFromTitle(title: string) {
+  const m = /(\d+(?:\.\d+)?)\s*[x×]\s*(\d+(?:\.\d+)?)\s*(?:ซม|cm)/i.exec(title);
+  return m ? `${m[1]}x${m[2]} ซม.` : null;
+}
+
 const looksLikeSize = (s: string) => /\d\s*(?:x|×)\s*\d|ซม|cm|มม|mm/i.test(s);
 
 export function buildShopeePlans(
-  input: { media: string[][]; sales: string[][]; basic?: string[][] | null },
+  input: { media: string[][]; sales: string[][] },
   opts: { a5BasePrice: number },
 ): { plans: ShopeePlan[]; excluded: ShopeeExcluded[] } {
   const media = tableOf(input.media);
   const sales = tableOf(input.sales);
-  const basic = input.basic ? tableOf(input.basic) : [];
-  const descKey = Object.keys(basic[0] ?? {}).find((k) => /description/i.test(k));
 
   const salesBy = new Map<string, Table>();
   for (const r of sales) salesBy.set(r[ID], [...(salesBy.get(r[ID]) ?? []), r]);
@@ -198,9 +201,31 @@ export function buildShopeePlans(
         price: null,
         units: null,
       }));
+    } else if (tier2.length === 1 && looksLikeSize(tier2[0].name)) {
+      sizes = [{ name: tier2[0].name, surcharge: 0, price: null, units: null }];
     }
+    // ไม่มีตัวเลือกขนาดใน Shopee: ใช้ขนาดจากชื่อสินค้า (การ์ดใส่ไว้ในคำอธิบาย เพราะตัวเลือกเป็นแพ็ค)
+    const titleSize = sizeFromTitle(title);
+    if (!isCard && !sizes.length && titleSize) sizes = [{ name: titleSize, surcharge: 0, price: null, units: null }];
 
-    const description = descKey ? basic.find((b) => b[ID] === itemId)?.[descKey] ?? "" : "";
+    // จำนวนดวง: ถ้าชื่อขนาดบอกจำนวนดวงไว้ ใช้ค่านั้น (ต่างกันตามขนาด = ดูที่ชื่อขนาดแทน)
+    const sizePieces = isCard ? [] : sizes.map((s) => piecesFromTitle(s.name));
+    const piecesPerSheet = isCard
+      ? null
+      : sizePieces.length && sizePieces.every((n) => n !== null)
+        ? sizePieces.every((n) => n === sizePieces[0])
+          ? sizePieces[0]
+          : null
+        : piecesFromTitle(title);
+    // จำนวนดวงเป็นช่วงหรือหลายค่า (ต่างกันตามลาย) เก็บไว้ในคำอธิบายแทน
+    const range = /(?<![\d.])(\d{1,4})\s*(?:[-–,]\s*(\d{1,4})\s*)ดวง/.exec(title);
+    const description = isCard
+      ? titleSize
+        ? `ขนาด ${titleSize}`
+        : ""
+      : piecesPerSheet === null && !sizePieces.some((n) => n !== null) && range
+        ? `จำนวน ${range[1]}–${range[2]} ดวง/แผ่น (ต่างกันตามลาย)`
+        : "";
     plans.push({
       itemId,
       title,
@@ -210,7 +235,7 @@ export function buildShopeePlans(
       pricing: isCard ? "fixed" : "a5",
       optionLabel,
       unitLabel: isCard ? "แพ็ค" : "แผ่น",
-      piecesPerSheet: isCard ? null : piecesFromTitle(title),
+      piecesPerSheet,
       material: /กันน้ำ/.test(title) ? "กันน้ำ 100%" : "",
       designCode,
       sizes,

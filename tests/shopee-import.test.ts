@@ -1,6 +1,6 @@
 import writeXlsxFile from "write-excel-file/node";
 import { describe, expect, it } from "vitest";
-import { buildShopeePlans, piecesFromTitle, shopeeFileKind, shortName, splitOption } from "@/lib/shopee-import";
+import { buildShopeePlans, piecesFromTitle, shopeeFileKind, shortName, sizeFromTitle, splitOption } from "@/lib/shopee-import";
 import { readXlsxRows } from "@/lib/xlsx-read";
 
 const ID = "et_title_product_id";
@@ -70,18 +70,28 @@ describe("นำเข้าจาก Shopee", () => {
       [220, 100],
     ]);
     expect(p.name).toBe("การ์ดขอบคุณ Thank you");
+    expect(p.description).toBe("ขนาด 9x5.5 ซม.");
   });
   it("สินค้าไม่มีตัวเลือก = 1 ลาย ใช้รูปปก", () => {
     const p = by("444444");
     expect(p.designs).toHaveLength(1);
     expect(p.designs[0].image).toBe(img("c5"));
     expect(p.designCode).toBe("S4444");
+    expect(p.sizes).toEqual([]);
+    expect(p.piecesPerSheet).toBe(18);
   });
   it("ตัวช่วยแยกชื่อ", () => {
     expect(splitOption("83-ธรรมดา")).toEqual({ code: "83", name: "ธรรมดา" });
     expect(splitOption("วาเลนไทน์เซ็ต")).toEqual({ code: "", name: "วาเลนไทน์เซ็ต" });
     expect(piecesFromTitle("กันน้ำ 100% 84ดวง/แผ่น")).toBe(84);
     expect(piecesFromTitle("กันน้ำ 100% 21-36ดวง/แผ่น")).toBeNull();
+    const range = buildShopeePlans(
+      { media: sheet(MEDIA_HEAD, "media_info", [["555555", "สติกเกอร์ ทุเรียน กันน้ำ 100% 21-36ดวง/แผ่น", img("c6")]]), sales: sheet(SALES_HEAD, "sales_info", [["555555", "", "", "20", "1"]]) },
+      { a5BasePrice: 15 },
+    ).plans[0];
+    expect(range.piecesPerSheet).toBeNull();
+    expect(range.description).toBe("จำนวน 21–36 ดวง/แผ่น (ต่างกันตามลาย)");
+    expect(sizeFromTitle("(2x2ซม.) สติกเกอร์ ไส้ขนม")).toBe("2x2 ซม.");
     expect(shortName("สติกเกอร์ บราวนี่ Brownie กันน้ำ 100% 36ดวง/แผ่น น่ารัก")).toBe("สติกเกอร์ บราวนี่ Brownie");
   });
   it("อ่านไฟล์ .xlsx และแยกประเภทไฟล์", async () => {

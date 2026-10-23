@@ -9,7 +9,7 @@ import { readXlsxRows } from "@/lib/xlsx-read";
 import { importShopeeImages, saveProduct, shopeeImportState, type ProductInput } from "../../../shop-actions";
 
 type Row = ShopeePlan & { checked: boolean; categoryId: string; done?: "ok" | "error"; error?: string; imported?: boolean };
-type Files = { media?: string[][]; sales?: string[][]; basic?: string[][] };
+type Files = { media?: string[][]; sales?: string[][] };
 
 const IMAGE_BATCH = 12;
 
@@ -32,7 +32,7 @@ export function ShopeeImporter({ categories, a5BasePrice }: { categories: { id: 
         const data = await readXlsxRows(await f.arrayBuffer());
         const kind = shopeeFileKind(data);
         if (!kind) {
-          setError(`ไฟล์ ${f.name} ไม่ใช่ไฟล์ export จาก Shopee (media_info / sales_info / basic_info)`);
+          setError(`ไฟล์ ${f.name} ไม่ใช่ไฟล์ export จาก Shopee (media_info / sales_info)`);
           continue;
         }
         next[kind] = data;
@@ -44,7 +44,7 @@ export function ShopeeImporter({ categories, a5BasePrice }: { categories: { id: 
     setFiles(next);
     setNames(nextNames);
     if (next.media && next.sales) {
-      const { plans, excluded } = buildShopeePlans({ media: next.media, sales: next.sales, basic: next.basic }, { a5BasePrice });
+      const { plans, excluded } = buildShopeePlans({ media: next.media, sales: next.sales }, { a5BasePrice });
       const { imported } = await shopeeImportState();
       const had = new Set(imported);
       setExcluded(excluded);
@@ -134,7 +134,7 @@ export function ShopeeImporter({ categories, a5BasePrice }: { categories: { id: 
       <section className="card space-y-3">
         <p className="text-sm">
           ใน Shopee Seller Centre ไปที่ <b>สินค้าของฉัน → อัปเดตสินค้าทีละหลายรายการ</b> แล้วดาวน์โหลดไฟล์ <b>ข้อมูลสื่อ (media_info)</b> และ{" "}
-          <b>ข้อมูลการขาย (sales_info)</b> · ไฟล์ <b>ข้อมูลพื้นฐาน (basic_info)</b> ใส่เพิ่มได้ถ้าต้องการคำอธิบายสินค้า
+          <b>ข้อมูลการขาย (sales_info)</b> · ไม่นำคำอธิบายสินค้ามา ใช้ขนาดและจำนวนดวงต่อแผ่นแทน
         </p>
         <label className="block">
           <span className="label">เลือกไฟล์ .xlsx (เลือกพร้อมกันหลายไฟล์ได้)</span>
@@ -155,7 +155,6 @@ export function ShopeeImporter({ categories, a5BasePrice }: { categories: { id: 
             [
               ["media", "ข้อมูลสื่อ (รูป)"],
               ["sales", "ข้อมูลการขาย (ราคา/คลัง)"],
-              ["basic", "ข้อมูลพื้นฐาน (คำอธิบาย) · ไม่บังคับ"],
             ] as const
           ).map(([k, label]) => (
             <li key={k} className={files[k] ? "text-ok" : "text-muted"}>
@@ -266,13 +265,13 @@ export function ShopeeImporter({ categories, a5BasePrice }: { categories: { id: 
                       )}{" "}
                       รหัส {r.designCode} · {r.designs.length} ลาย
                       {r.designs.some((d) => !d.active) && ` (หมด ${r.designs.filter((d) => !d.active).length})`}
-                      {r.piecesPerSheet ? ` · ${r.piecesPerSheet} ดวง/แผ่น` : ""}
                       {r.skippedFlawed > 0 && ` · ตัดตำหนิ ${r.skippedFlawed}`}
                       {r.sizes.length > 0 &&
                         ` · ${r.optionLabel}: ${r.sizes
                           .map((s) => (r.pricing === "fixed" ? `${s.name} ฿${s.price}` : s.surcharge ? `${s.name} +฿${s.surcharge}` : s.name))
                           .join(", ")}`}
                     </p>
+                    {r.description && <p className="text-xs text-muted">{r.description}</p>}
                     <div className="flex flex-wrap items-center gap-2">
                       <select
                         className="input !w-auto !py-1 text-sm"
@@ -288,6 +287,23 @@ export function ShopeeImporter({ categories, a5BasePrice }: { categories: { id: 
                           </option>
                         ))}
                       </select>
+                      {r.pricing === "a5" && (
+                        <label className="flex items-center gap-1.5 text-sm">
+                          <input
+                            type="number"
+                            min={1}
+                            inputMode="numeric"
+                            aria-label={`จำนวนดวงต่อแผ่น ${r.name}`}
+                            className={`input !w-20 !py-1 text-sm ${
+                              !r.piecesPerSheet && !r.description && !r.sizes.some((s) => /ดวง/.test(s.name)) ? "ring-2 ring-warn" : ""
+                            }`}
+                            value={r.piecesPerSheet ?? ""}
+                            disabled={busy || r.imported || r.done === "ok"}
+                            onChange={(e) => update(r.itemId, { piecesPerSheet: Math.floor(Number(e.target.value)) || null })}
+                          />
+                          ดวง/แผ่น
+                        </label>
+                      )}
                       {r.imported && <span className="text-xs text-muted">นำเข้าแล้ว</span>}
                       {r.done === "ok" && <span className="text-xs text-ok">✓ นำเข้าแล้ว</span>}
                       {r.done === "error" && <span className="text-xs text-bad">{r.error}</span>}
