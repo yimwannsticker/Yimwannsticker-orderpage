@@ -4,6 +4,7 @@ import crypto from "node:crypto";
 import { revalidatePath, updateTag } from "next/cache";
 import { requireStaff } from "@/lib/server/auth";
 import { CATALOG_TAG } from "@/lib/server/shop";
+import * as storage from "@/lib/server/storage";
 import { db } from "@/lib/supabase/admin";
 
 type Result = { ok: true; message?: string; id?: string } | { ok: false; error: string };
@@ -241,4 +242,76 @@ export async function setAllPicked(orderId: string, picked: boolean): Promise<Re
   if (error) return { ok: false, error: error.message };
   revalidatePath(`/admin/orders/${orderId}`);
   return { ok: true };
+}
+
+// ---------- นำเข้าจาก Shopee ----------
+
+const IMAGE_TYPES: Record<string, string> = { "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp" };
+
+/** รับเฉพาะรูปจาก CDN ของ Shopee (กันใช้ server ไปโหลดลิงก์อื่น) */
+function shopeeImageUrl(raw: unknown) {
+  try {
+    const u = new URL(String(raw));
+    if (u.protocol !== "https:" || !(u.hostname === "cf.shopee.co.th" || /(^|\.)susercontent\.com$/.test(u.hostname))) return null;
+    // ตอนทดสอบในเครื่อง (ออกเน็ตไป Shopee ไม่ได้) ชี้ไปที่ server รูปจำลองได้
+    const dev = process.env.NODE_ENV !== "production" && process.env.SHOPEE_IMAGE_DEV_BASE;
+    return dev ? `${dev.replace(/\/$/, "")}${u.pathname}` : u.toString();
+  } catch {
+    return null;
+  }
+}
+
+async function fetchImage(url: string) {
+  const res = await fetch(url, { signal: AbortSignal.timeout(15_000) });
+  if (!res.ok) return null;
+  const type = (res.headers.get("content-type") ?? "").split(";")[0].trim().toLowerCase();
+  const ext = IMAGE_TYPES[type];
+  const body = await res.arrayBuffer();
+  if (!ext || body.byteLength > 5 * 1024 * 1024) return null;
+  const path = `catalog/${crypto.randomUUID()}.${ext}`;
+  await storage.put(path, body, type);
+  return path;
+}
+
+/**
+ * ดึงรูปจาก Shopee มาเก็บใน R2 (รูปเต็ม + รูปย่อจาก Shopee ที่ต่อท้าย _tn)
+ * ส่งมาทีละไม่เกิน 30 รูป คืน { [ลิงก์ Shopee]: { path, thumb } } เฉพาะรูปที่สำเร็จ
+ */
+export async function importShopeeImages(
+  urls: string[],
+): Promise<{ ok: true; images: Record<string, { path: string; thumb: string }>; failed: number } | { ok: false; error: string }> {
+  await requireStaff("admin");
+  const list = [...new Set((Array.isArray(urls) ? urls : []).map(String))].slice(0, 30);
+  const images: Record<string, { path: string; thumb: string }> = {};
+  let failed = 0;
+  let next = 0;
+  const worker = async () => {
+    while (next < list.length) {
+      const raw = list[next++];
+      const url = shopeeImageUrl(raw);
+      try {
+        const path = url ? await fetchImage(url) : null;
+        if (!path) {
+          failed++;
+          continue;
+        }
+        const thumb = (await fetchImage(`${url}_tn`).catch(() => null)) ?? path;
+        images[raw] = { path, thumb };
+      } catch {
+        failed++;
+      }
+    }
+  };
+  await Promise.all(Array.from({ length: 6 }, worker));
+  return { ok: true, images, failed };
+}
+
+/** รหัสสินค้า Shopee ที่นำเข้าแล้ว และ SKU ที่ใช้แล้วทั้งหมด (ไว้กันซ้ำตอนนำเข้า) */
+export async function shopeeImportState(): Promise<{ imported: string[]; skus: string[] }> {
+  await requireStaff("admin");
+  const [{ data: p }, { data: d }] = await Promise.all([
+    db().from("shop_products").select("shopee_item_id").not("shopee_item_id", "is", null),
+    db().from("shop_designs").select("sku"),
+  ]);
+  return { imported: (p ?? []).map((x) => String(x.shopee_item_id)), skus: (d ?? []).map((x) => String(x.sku)) };
 }

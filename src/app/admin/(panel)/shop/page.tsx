@@ -34,6 +34,9 @@ export default async function ShopAdminPage({ searchParams }: { searchParams: Pr
           <Link href="/admin/reports" className="btn-secondary btn-sm">
             รายงานยอดขาย
           </Link>
+          <Link href="/admin/shop/import" className="btn-secondary btn-sm">
+            นำเข้าจาก Shopee
+          </Link>
           <Link href="/admin/shop/new" className="btn-primary btn-sm">
             + เพิ่มสินค้า
           </Link>

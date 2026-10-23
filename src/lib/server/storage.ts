@@ -72,6 +72,13 @@ export function readUrl(path: string, expires = 60 * 30, downloadName?: string) 
   );
 }
 
+/** อัปโหลดไฟล์จาก server ตรง */
+export async function put(path: string, body: ArrayBuffer, contentType: string) {
+  const { client } = config();
+  const res = await client.fetch(objectUrl(path), { method: "PUT", body, headers: { "content-type": contentType } });
+  if (!res.ok) throw new Error(`อัปโหลดไฟล์ไม่สำเร็จ (${res.status})`);
+}
+
 export async function exists(path: string) {
   const { client } = config();
   const res = await client.fetch(objectUrl(path), { method: "HEAD" });
