@@ -5,6 +5,7 @@ import { requireStaff } from "@/lib/server/auth";
 import { getQuota } from "@/lib/server/line";
 import { db } from "@/lib/supabase/admin";
 import type { OrderStatus } from "@/lib/types";
+import { PrintSelected } from "./print-select";
 
 const FILTERS: { key: string; label: string }[] = [
   { key: "active", label: "ต้องทำ" },
@@ -31,7 +32,7 @@ export default async function OrdersPage({
 
   let query = db()
     .from("orders")
-    .select("id, order_no, status, customer_name, customer_phone, total, total_sheets, free_sheets, needs_attention, attention_note, created_at, order_items(count)", {
+    .select("id, order_no, status, customer_name, customer_phone, total, total_sheets, free_sheets, a5_sheets, needs_attention, attention_note, created_at, order_items(count)", {
       count: "exact",
     })
     .order("created_at", { ascending: asc })
@@ -89,31 +90,37 @@ export default async function OrdersPage({
       </div>
 
       {!orders?.length && <p className="card text-center text-muted">ไม่มีออเดอร์</p>}
+      {/* เลือกหลายออเดอร์ → พิมพ์ใบรายการสินค้ารวมเป็น PDF ไฟล์เดียว */}
+      {!!orders?.length && <PrintSelected />}
 
       {/* มือถือ: การ์ด / จอใหญ่: ตาราง */}
       <div className="grid gap-2 md:hidden">
         {orders?.map((o) => (
-          <Link key={o.id} href={`/admin/orders/${o.id}`} className="card block !p-4">
-            <div className="flex items-center justify-between gap-2">
-              <p className="font-bold">
-                {o.order_no}
-                {o.needs_attention && <span className="ml-2 inline-block h-2.5 w-2.5 rounded-full bg-brand-500 align-middle" />}
+          <div key={o.id} className="card flex items-start gap-3 !p-4">
+            <input type="checkbox" form="print-orders" name="ids" value={o.id} aria-label={`เลือก ${o.order_no}`} className="mt-1 h-5 w-5 shrink-0 accent-brand-500" />
+            <Link href={`/admin/orders/${o.id}`} className="block min-w-0 flex-1">
+              <div className="flex items-center justify-between gap-2">
+                <p className="font-bold">
+                  {o.order_no}
+                  {o.needs_attention && <span className="ml-2 inline-block h-2.5 w-2.5 rounded-full bg-brand-500 align-middle" />}
+                </p>
+                <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${STATUS_COLOR[o.status as OrderStatus]}`}>
+                  {STATUS_LABEL[o.status as OrderStatus]}
+                </span>
+              </div>
+              <p className="mt-1 text-sm">
+                {o.customer_name} · {o.customer_phone}
               </p>
-              <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${STATUS_COLOR[o.status as OrderStatus]}`}>
-                {STATUS_LABEL[o.status as OrderStatus]}
-              </span>
-            </div>
-            <p className="mt-1 text-sm">
-              {o.customer_name} · {o.customer_phone}
-            </p>
-            <p className="text-sm text-muted">
-              {(o.order_items as unknown as { count: number }[])[0]?.count ?? 0} ไฟล์ · {o.total_sheets} แผ่น
-              {o.free_sheets ? ` +แถม ${o.free_sheets}` : ""}
-              {isAdmin && ` · ${baht(Number(o.total))}`}
-            </p>
-            <p className="text-xs text-muted">{thaiDate(o.created_at)}</p>
-            {o.needs_attention && o.attention_note && <p className="mt-1 text-xs font-medium text-brand-600">{o.attention_note}</p>}
-          </Link>
+              <p className="text-sm text-muted">
+                {o.a5_sheets ? `A5 ${o.a5_sheets} แผ่น · ` : ""}
+                {(o.order_items as unknown as { count: number }[])[0]?.count ?? 0} ไฟล์ · {o.total_sheets} แผ่น
+                {o.free_sheets ? ` +แถม ${o.free_sheets}` : ""}
+                {isAdmin && ` · ${baht(Number(o.total))}`}
+              </p>
+              <p className="text-xs text-muted">{thaiDate(o.created_at)}</p>
+              {o.needs_attention && o.attention_note && <p className="mt-1 text-xs font-medium text-brand-600">{o.attention_note}</p>}
+            </Link>
+          </div>
         ))}
       </div>
 
@@ -121,6 +128,7 @@ export default async function OrdersPage({
         <table className="w-full text-sm">
           <thead className="bg-gray-50 text-left text-muted">
             <tr>
+              <th className="w-10 py-2 pl-4" />
               <th className="px-4 py-2 font-medium">ออเดอร์</th>
               <th className="px-4 py-2 font-medium">วันที่</th>
               <th className="px-4 py-2 font-medium">ลูกค้า</th>
@@ -132,6 +140,9 @@ export default async function OrdersPage({
           <tbody>
             {orders?.map((o) => (
               <tr key={o.id} className="border-t border-line hover:bg-brand-50/40">
+                <td className="py-2.5 pl-4">
+                  <input type="checkbox" form="print-orders" name="ids" value={o.id} aria-label={`เลือก ${o.order_no}`} className="h-4 w-4 accent-brand-500" />
+                </td>
                 <td className="px-4 py-2.5">
                   <Link href={`/admin/orders/${o.id}`} className="font-bold text-brand-600 hover:underline">
                     {o.order_no}
@@ -148,8 +159,13 @@ export default async function OrdersPage({
                   <span className="block text-xs text-muted">{o.customer_phone}</span>
                 </td>
                 <td className="px-4 py-2.5">
-                  {o.total_sheets} แผ่น{o.free_sheets ? ` +${o.free_sheets}` : ""}
-                  <span className="block text-xs text-muted">{(o.order_items as unknown as { count: number }[])[0]?.count ?? 0} ไฟล์</span>
+                  {o.a5_sheets ? <span className="block">A5 {o.a5_sheets} แผ่น</span> : null}
+                  {((o.order_items as unknown as { count: number }[])[0]?.count ?? 0) > 0 && (
+                    <>
+                      {o.total_sheets} แผ่น{o.free_sheets ? ` +${o.free_sheets}` : ""}
+                      <span className="block text-xs text-muted">{(o.order_items as unknown as { count: number }[])[0]?.count ?? 0} ไฟล์</span>
+                    </>
+                  )}
                 </td>
                 {isAdmin && <td className="px-4 py-2.5 text-right">{baht(Number(o.total))}</td>}
                 <td className="px-4 py-2.5">

@@ -55,6 +55,15 @@ export const DEFAULT_SETTINGS: Settings = {
     "ขอให้น้ำขายดี ขนมขายหมด กลับบ้านกระเป๋าตุงๆ ค่ะ 🧋🍰💸",
     "ขอให้แบรนด์ของคุณ{n}มีเสน่ห์ ลูกค้าหลงรักจนต้องกลับมาซื้อซ้ำค่ะ 💘",
   ],
+  a5Tiers: [
+    { min: 1, price: 15 },
+    { min: 15, price: 12 },
+    { min: 50, price: 11 },
+    { min: 100, price: 10 },
+  ],
+  a5ShippingFee: 30,
+  a5FreeShippingMin: 15,
+  banners: [],
 };
 
 export const PRODUCTS: Record<ProductKey, { label: string; description: string }> = {

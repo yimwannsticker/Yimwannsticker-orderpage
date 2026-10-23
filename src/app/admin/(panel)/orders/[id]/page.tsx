@@ -5,10 +5,13 @@ import { STATUS_COLOR, STATUS_LABEL, carrierInfo, productLabel, shapeLabel } fro
 import { sizeText } from "@/lib/sticker-size";
 import { baht, fileSizeText, formatAddress, thaiDate } from "@/lib/format";
 import { requireStaff } from "@/lib/server/auth";
-import { getItems, getPoints, signedUrls, statusUrl, type OrderRow } from "@/lib/server/orders";
+import { getA5Items, getItems, getPoints, signedUrls, statusUrl, type OrderRow } from "@/lib/server/orders";
+import { imageUrl } from "@/lib/server/storage";
+import { shortOrderText } from "@/lib/pack";
 import { db } from "@/lib/supabase/admin";
 import type { CheckResult, Trim } from "@/lib/types";
 import { AdminNote, DownloadButton, ItemActions, MarkSeen, PaymentActions, StatusActions, TrackingForm } from "./client";
+import { PickList } from "./pick";
 import { AdminPreview } from "./preview";
 
 export default async function OrderDetailPage({ params }: { params: Promise<{ id: string }> }) {
@@ -18,7 +21,9 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
   if (!data) notFound();
   const order = data as OrderRow;
   const isAdmin = staff.role === "admin";
-  const items = await getItems(order.id);
+  const [items, a5Items] = await Promise.all([getItems(order.id), getA5Items(order.id)]);
+  const a5Thumbs = Object.fromEntries(await Promise.all(a5Items.map(async (i) => [i.id, await imageUrl(i.thumb_path)] as const)));
+  const shortText = shortOrderText(a5Items, { files: items.length, sheets: order.total_sheets, free: order.free_sheets });
   const [previews, slipUrls, pts] = await Promise.all([
     signedUrls(items.map((i) => i.preview_path), 60 * 60),
     isAdmin && order.slip_path ? signedUrls([order.slip_path], 60 * 60) : Promise.resolve({} as Record<string, string>),
@@ -50,7 +55,11 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
         <h1 className="text-2xl font-bold">{order.order_no}</h1>
         <span className={`rounded-full px-3 py-1 text-sm font-semibold ${STATUS_COLOR[order.status]}`}>{STATUS_LABEL[order.status]}</span>
         <span className="text-sm text-muted">สั่งเมื่อ {thaiDate(order.created_at)}</span>
-        <div className="ml-auto">
+        <div className="ml-auto flex flex-wrap gap-2">
+          <a href={`/admin/print?ids=${order.id}`} target="_blank" className="btn-secondary btn-sm">
+            🖨️ ใบรายการสินค้า
+          </a>
+          <CopyButton text={shortText} label="คัดลอกรายการแบบสั้น" />
           <CopyButton text={statusUrl(order.token)} label="คัดลอกลิงก์หน้าเช็คสถานะ" />
         </div>
       </div>
@@ -60,100 +69,131 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
 
       <div className="grid gap-4 lg:grid-cols-3">
         <div className="space-y-4 lg:col-span-2">
-          <div className="card space-y-4">
-            <h2 className="font-bold">
-              ไฟล์งาน ({items.length} ไฟล์ · {order.total_sheets} แผ่น{order.free_sheets ? ` + แถม ${order.free_sheets}` : ""})
-            </h2>
-            {order.files_deleted_at && <p className="text-sm text-muted">ไฟล์ถูกลบอัตโนมัติแล้วเมื่อ {thaiDate(order.files_deleted_at)}</p>}
-            {items.map((i) => (
-              <div key={i.id} className="rounded-2xl border border-line p-3">
-                <div className="flex gap-3">
-                  <AdminPreview
-                    url={i.preview_path ? (previews[i.preview_path] ?? null) : null}
-                    fileName={i.file_name}
-                    trim={i.trim}
-                  />
-                  <div className="min-w-0 flex-1 space-y-1 text-sm">
-                    <p className="font-semibold">
-                      {i.position}. {i.file_name}
-                    </p>
-                    <p className="text-muted">{fileSizeText(i.file_size)}</p>
-                    <p>
-                      {i.shape && (
-                        <span className="mb-0.5 block font-semibold text-brand-700">
-                          ไดคัท{shapeLabel(i.shape)} {sizeText({ shape: i.shape, widthMm: Number(i.width_mm), heightMm: Number(i.height_mm) })}
-                          {i.per_sheet ? <span className="font-normal text-muted"> · แผ่นละ ~{i.per_sheet} ดวง</span> : null}
-                        </span>
-                      )}
-                      <b>{productLabel(i.product, i.finish)}</b> · {i.qty} แผ่น
-                      {i.free_qty > 0 && <span className="font-semibold text-ok"> + แถม {i.free_qty} แผ่น</span>}
-                      <span className="text-muted"> (พิมพ์ทั้งหมด {i.qty + i.free_qty} แผ่น)</span>
-                    </p>
-                    {isAdmin && (
-                      <p className="text-muted">
-                        {baht(Number(i.unit_price))}/แผ่น = {baht(Number(i.line_total))}
-                        {i.fix_service && ` + แก้ไฟล์ ${baht(Number(i.fix_fee))}`}
+          {a5Items.length > 0 && (
+            <div className="card space-y-3">
+              <h2 className="font-bold">สติกเกอร์สำเร็จรูป A5 ({order.a5_sheets ?? 0} แผ่น)</h2>
+              <PickList
+                orderId={order.id}
+                items={a5Items.map((i) => ({
+                  id: i.id,
+                  sku: i.sku,
+                  productName: i.product_name,
+                  designName: i.design_name,
+                  sizeName: i.size_name,
+                  qty: i.qty,
+                  thumbUrl: a5Thumbs[i.id] ?? null,
+                  picked: Boolean(i.picked_at),
+                }))}
+              />
+            </div>
+          )}
+          {items.length > 0 && (
+            <div className="card space-y-4">
+              <h2 className="font-bold">
+                ไฟล์งาน ({items.length} ไฟล์ · {order.total_sheets} แผ่น{order.free_sheets ? ` + แถม ${order.free_sheets}` : ""})
+              </h2>
+              {order.files_deleted_at && (
+                <p className="text-sm text-muted">ไฟล์ถูกลบอัตโนมัติแล้วเมื่อ {thaiDate(order.files_deleted_at)}</p>
+              )}
+              {items.map((i) => (
+                <div key={i.id} className="rounded-2xl border border-line p-3">
+                  <div className="flex gap-3">
+                    <AdminPreview url={i.preview_path ? (previews[i.preview_path] ?? null) : null} fileName={i.file_name} trim={i.trim} />
+                    <div className="min-w-0 flex-1 space-y-1 text-sm">
+                      <p className="font-semibold">
+                        {i.position}. {i.file_name}
                       </p>
-                    )}
-                    <div className="flex flex-wrap gap-1.5">
-                      {i.trim && (
-                        <span className="rounded-full bg-brand-50 px-2 py-0.5 text-xs font-semibold text-brand-700">
-                          ✂️ ลูกค้าเลือกตัดพื้นหลังรอบงาน · {trimText(i.trim, i.check_result)}
+                      <p className="text-muted">{fileSizeText(i.file_size)}</p>
+                      <p>
+                        {i.shape && (
+                          <span className="mb-0.5 block font-semibold text-brand-700">
+                            ไดคัท{shapeLabel(i.shape)}{" "}
+                            {sizeText({ shape: i.shape, widthMm: Number(i.width_mm), heightMm: Number(i.height_mm) })}
+                            {i.per_sheet ? <span className="font-normal text-muted"> · แผ่นละ ~{i.per_sheet} ดวง</span> : null}
+                          </span>
+                        )}
+                        <b>{productLabel(i.product, i.finish)}</b> · {i.qty} แผ่น
+                        {i.free_qty > 0 && <span className="font-semibold text-ok"> + แถม {i.free_qty} แผ่น</span>}
+                        <span className="text-muted"> (พิมพ์ทั้งหมด {i.qty + i.free_qty} แผ่น)</span>
+                      </p>
+                      {isAdmin && (
+                        <p className="text-muted">
+                          {baht(Number(i.unit_price))}/แผ่น = {baht(Number(i.line_total))}
+                          {i.fix_service && ` + แก้ไฟล์ ${baht(Number(i.fix_fee))}`}
+                        </p>
+                      )}
+                      <div className="flex flex-wrap gap-1.5">
+                        {i.trim && (
+                          <span className="rounded-full bg-brand-50 px-2 py-0.5 text-xs font-semibold text-brand-700">
+                            ✂️ ลูกค้าเลือกตัดพื้นหลังรอบงาน · {trimText(i.trim, i.check_result)}
+                          </span>
+                        )}
+                        {i.fix_service && (
+                          <span className="rounded-full bg-blue-50 px-2 py-0.5 text-xs font-semibold text-blue-700">ให้ร้านแก้ไฟล์</span>
+                        )}
+                        {i.accept_risk && (
+                          <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs font-semibold">ลูกค้ายอมรับความเสี่ยง</span>
+                        )}
+                        {i.reorder_of && prev.get(i.reorder_of) && (
+                          <Link
+                            href={`/admin/orders/${prev.get(i.reorder_of)!.orderId}`}
+                            className="rounded-full bg-brand-50 px-2 py-0.5 text-xs font-semibold text-brand-700 underline"
+                          >
+                            ↻ สั่งซ้ำจาก {prev.get(i.reorder_of)!.orderNo} รายการที่ {prev.get(i.reorder_of)!.position}
+                            {prev.get(i.reorder_of)!.fixed && " (ครั้งก่อนร้านแก้ไฟล์ให้)"}
+                          </Link>
+                        )}
+                        {i.reupload_requested && (
+                          <span className="rounded-full bg-warn-bg px-2 py-0.5 text-xs font-semibold text-warn">รอลูกค้าส่งไฟล์ใหม่</span>
+                        )}
+                        {i.reuploaded_at && (
+                          <span className="rounded-full bg-ok-bg px-2 py-0.5 text-xs font-semibold text-ok">
+                            ส่งไฟล์ใหม่ {thaiDate(i.reuploaded_at)}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                  {i.check_result && (
+                    <div className="mt-3 rounded-xl bg-gray-50 p-3">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <CheckBadge level={i.check_result.level} title={i.check_result.title} />
+                        <span className="text-xs text-muted">
+                          {[
+                            i.check_result.info.widthPx && `${i.check_result.info.widthPx}×${i.check_result.info.heightPx}px`,
+                            i.check_result.info.dpi && `${i.check_result.info.dpi} DPI ที่ขนาดดวง`,
+                            i.check_result.info.colorMode,
+                            i.check_result.info.pageWidthMm &&
+                              `หน้า ${i.check_result.info.pageWidthMm}×${i.check_result.info.pageHeightMm}มม.`,
+                            i.check_result.info.pages && `${i.check_result.info.pages} หน้า`,
+                            i.check_result.info.minImageDpi && `รูปต่ำสุด ${i.check_result.info.minImageDpi} DPI`,
+                            i.check_result.checkedBy === "browser" ? "ตรวจใน browser" : "ตรวจที่ server",
+                          ]
+                            .filter(Boolean)
+                            .join(" · ")}
                         </span>
-                      )}
-                      {i.fix_service && <span className="rounded-full bg-blue-50 px-2 py-0.5 text-xs font-semibold text-blue-700">ให้ร้านแก้ไฟล์</span>}
-                      {i.accept_risk && <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs font-semibold">ลูกค้ายอมรับความเสี่ยง</span>}
-                      {i.reorder_of && prev.get(i.reorder_of) && (
-                        <Link
-                          href={`/admin/orders/${prev.get(i.reorder_of)!.orderId}`}
-                          className="rounded-full bg-brand-50 px-2 py-0.5 text-xs font-semibold text-brand-700 underline"
-                        >
-                          ↻ สั่งซ้ำจาก {prev.get(i.reorder_of)!.orderNo} รายการที่ {prev.get(i.reorder_of)!.position}
-                          {prev.get(i.reorder_of)!.fixed && " (ครั้งก่อนร้านแก้ไฟล์ให้)"}
-                        </Link>
-                      )}
-                      {i.reupload_requested && (
-                        <span className="rounded-full bg-warn-bg px-2 py-0.5 text-xs font-semibold text-warn">รอลูกค้าส่งไฟล์ใหม่</span>
-                      )}
-                      {i.reuploaded_at && <span className="rounded-full bg-ok-bg px-2 py-0.5 text-xs font-semibold text-ok">ส่งไฟล์ใหม่ {thaiDate(i.reuploaded_at)}</span>}
+                      </div>
+                      <CheckDetails check={i.check_result} />
                     </div>
+                  )}
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {i.file_path && <DownloadButton path={i.file_path} label="ดาวน์โหลดไฟล์ต้นฉบับ" />}
+                    <ItemActions itemId={i.id} requested={i.reupload_requested} reason={i.reupload_reason} />
                   </div>
                 </div>
-                {i.check_result && (
-                  <div className="mt-3 rounded-xl bg-gray-50 p-3">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <CheckBadge level={i.check_result.level} title={i.check_result.title} />
-                      <span className="text-xs text-muted">
-                        {[
-                          i.check_result.info.widthPx && `${i.check_result.info.widthPx}×${i.check_result.info.heightPx}px`,
-                          i.check_result.info.dpi && `${i.check_result.info.dpi} DPI ที่ขนาดดวง`,
-                          i.check_result.info.colorMode,
-                          i.check_result.info.pageWidthMm && `หน้า ${i.check_result.info.pageWidthMm}×${i.check_result.info.pageHeightMm}มม.`,
-                          i.check_result.info.pages && `${i.check_result.info.pages} หน้า`,
-                          i.check_result.info.minImageDpi && `รูปต่ำสุด ${i.check_result.info.minImageDpi} DPI`,
-                          i.check_result.checkedBy === "browser" ? "ตรวจใน browser" : "ตรวจที่ server",
-                        ]
-                          .filter(Boolean)
-                          .join(" · ")}
-                      </span>
-                    </div>
-                    <CheckDetails check={i.check_result} />
-                  </div>
-                )}
-                <div className="mt-3 flex flex-wrap gap-2">
-                  {i.file_path && <DownloadButton path={i.file_path} label="ดาวน์โหลดไฟล์ต้นฉบับ" />}
-                  <ItemActions itemId={i.id} requested={i.reupload_requested} reason={i.reupload_reason} />
-                </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
 
           {isAdmin && (
             <div className="card space-y-3">
               <h2 className="font-bold">การชำระเงิน</h2>
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="space-y-1 text-sm">
-                  <Row label={`ค่าสติกเกอร์ ${order.total_sheets} แผ่น`} value={baht(Number(order.subtotal))} />
+                  {(order.a5_sheets ?? 0) > 0 && (
+                    <Row label={`สติกเกอร์ A5 ${order.a5_sheets} แผ่น`} value={baht(Number(order.a5_subtotal))} />
+                  )}
+                  {items.length > 0 && <Row label={`งานพิมพ์ไฟล์ ${order.total_sheets} แผ่น`} value={baht(Number(order.subtotal))} />}
                   {Number(order.fix_fee_total) > 0 && <Row label="ค่าแก้ไฟล์" value={baht(Number(order.fix_fee_total))} />}
                   <Row label="ค่าส่ง" value={Number(order.shipping_fee) ? baht(Number(order.shipping_fee)) : "ส่งฟรี"} />
                   <div className="flex justify-between border-t border-line pt-1 text-base font-bold">

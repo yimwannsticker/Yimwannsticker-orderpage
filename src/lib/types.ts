@@ -86,6 +86,33 @@ export interface Settings {
   welcomeMessages: string[];
   /** ข้อความขอบคุณ/อวยพรหน้าสั่งเสร็จแบบสุ่ม ({n} = ชื่อลูกค้า) */
   thankYouMessages: string[];
+  /** ราคาส่งสติกเกอร์สำเร็จรูป A5: ขั้นบันไดตามจำนวนแผ่น A5 รวมทั้งตะกร้า */
+  a5Tiers: A5Tier[];
+  a5ShippingFee: number;
+  /** A5 ครบกี่แผ่นส่งฟรี (นับแยกจาก A3+) */
+  a5FreeShippingMin: number;
+  /** แบนเนอร์หน้าแรก (รูปใน R2) */
+  banners: Banner[];
+}
+
+export interface A5Tier {
+  /** จำนวนแผ่น A5 รวมขั้นต่ำของขั้นนี้ */
+  min: number;
+  price: number;
+}
+
+export interface Banner {
+  path: string;
+  /** ลิงก์เมื่อกด (ไม่บังคับ) เช่น /p/xxx หรือ /category?c=xxx */
+  link: string;
+}
+
+/** รายการในตะกร้า A5 (เก็บในเครื่องลูกค้า) */
+export interface A5CartLine {
+  productId: string;
+  designId: string;
+  sizeId: string | null;
+  qty: number;
 }
 
 /** ส่วนที่ส่งให้ฝั่งลูกค้าได้ (ไม่มีข้อมูลภายใน) */

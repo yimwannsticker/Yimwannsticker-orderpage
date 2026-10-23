@@ -5,9 +5,10 @@ import { STATUS_FLOW, STATUS_LABEL, carrierInfo, productLabel, shapeLabel, track
 import { sizeText } from "@/lib/sticker-size";
 import { baht, formatAddress, thaiDate } from "@/lib/format";
 import { toNextFree } from "@/lib/pricing";
-import { getItems, getOrderByToken, getPoints, signedUrls } from "@/lib/server/orders";
+import { getA5Items, getItems, getOrderByToken, getPoints, signedUrls } from "@/lib/server/orders";
+import { imageUrl } from "@/lib/server/storage";
 import { getSettings, toPublic } from "@/lib/server/settings";
-import { ReuploadButton, SlipReupload } from "./client";
+import { ReorderA5Button, ReuploadButton, SlipReupload } from "./client";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "สถานะออเดอร์ | Yimwann Sticker", robots: { index: false } };
@@ -16,7 +17,16 @@ export default async function OrderStatusPage({ params }: { params: Promise<{ to
   const { token } = await params;
   const order = await getOrderByToken(token);
   if (!order) notFound();
-  const [items, settings, pts] = await Promise.all([getItems(order.id), getSettings(), getPoints(order.customer_phone)]);
+  const [items, a5Items, settings, pts] = await Promise.all([
+    getItems(order.id),
+    getA5Items(order.id),
+    getSettings(),
+    getPoints(order.customer_phone),
+  ]);
+  const a5Thumbs = Object.fromEntries(await Promise.all(a5Items.map(async (i) => [i.id, await imageUrl(i.thumb_path)] as const)));
+  const a5Again = a5Items
+    .filter((i) => i.product_id && i.design_id)
+    .map((i) => ({ productId: i.product_id!, designId: i.design_id!, sizeId: i.size_id, qty: i.qty }));
   const previews = await signedUrls(items.map((i) => i.preview_path));
   const pub = toPublic(settings);
   const idx = STATUS_FLOW.indexOf(order.status);
@@ -32,7 +42,7 @@ export default async function OrderStatusPage({ params }: { params: Promise<{ to
   return (
     <main className="mx-auto max-w-xl space-y-4 px-4 py-6">
       <Link href="/" className="text-sm text-brand-600">
-        ← สั่งพิมพ์เพิ่ม
+        ← กลับร้านค้า
       </Link>
       <div className="card">
         <p className="text-sm text-muted">เลขออเดอร์</p>
@@ -42,8 +52,13 @@ export default async function OrderStatusPage({ params }: { params: Promise<{ to
         </div>
         <p className="mt-1 text-sm text-muted">สั่งเมื่อ {thaiDate(order.created_at)}</p>
         <p className="mt-2 text-xs text-muted">บันทึกลิงก์หน้านี้ไว้เพื่อกลับมาเช็คสถานะได้ตลอด</p>
+        {a5Again.length > 0 && (
+          <div className="mt-3">
+            <ReorderA5Button lines={a5Again} />
+          </div>
+        )}
         {items.some((i) => i.file_path) ? (
-          <Link href={`/?reorder=${encodeURIComponent(token)}`} className="btn-secondary mt-3 w-full">
+          <Link href={`/print?reorder=${encodeURIComponent(token)}`} className="btn-secondary mt-3 w-full">
             ↻ สั่งซ้ำแบบเดิม (ไม่ต้องส่งไฟล์ใหม่)
           </Link>
         ) : (
@@ -130,6 +145,33 @@ export default async function OrderStatusPage({ params }: { params: Promise<{ to
 
       <div className="card space-y-3">
         <h2 className="font-bold">รายการ</h2>
+        {a5Items.length > 0 && (
+          <div className="space-y-2 border-b border-line pb-3">
+            <p className="text-sm font-semibold">
+              สติกเกอร์สำเร็จรูป A5 · {order.a5_sheets} แผ่น · {baht(Number(order.a5_subtotal))}
+            </p>
+            {a5Items.map((i) => (
+              <div key={i.id} className="flex items-center gap-2.5 text-sm">
+                <div className="h-10 w-10 shrink-0 overflow-hidden rounded-lg bg-gray-50">
+                  {a5Thumbs[i.id] && (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={a5Thumbs[i.id]!} alt="" className="h-full w-full object-contain" />
+                  )}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate">{i.product_name}</p>
+                  <p className="text-xs text-muted">
+                    {i.sku} {i.design_name}
+                    {i.size_name && ` · ${i.size_name}`}
+                  </p>
+                </div>
+                <span className="shrink-0 text-muted">
+                  {i.qty} × {baht(Number(i.unit_price))}
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
         {items.map((i) => (
           <div key={i.id} className="flex gap-3 border-b border-line pb-3 last:border-0 last:pb-0">
             <div className="h-16 w-16 shrink-0 overflow-hidden rounded-xl bg-gray-50">

@@ -30,7 +30,7 @@ export async function GET(req: Request) {
 
   if (format === "csv") {
     const orders = (await all("orders")).sort((a, b) => String(a.created_at).localeCompare(String(b.created_at)));
-    const head = ["เลขออเดอร์", "วันที่สั่ง", "สถานะ", "ชื่อ", "เบอร์", "ที่อยู่", "แผ่น", "แถม", "ค่าส่ง", "ยอดรวม", "ขนส่ง", "เลขแทร็ค"];
+    const head = ["เลขออเดอร์", "วันที่สั่ง", "สถานะ", "ชื่อ", "เบอร์", "ที่อยู่", "แผ่น A5", "แผ่น A3+", "แถม", "ค่าส่ง", "ยอดรวม", "ขนส่ง", "เลขแทร็ค"];
     const lines = orders.map((o) =>
       [
         o.order_no,
@@ -39,6 +39,7 @@ export async function GET(req: Request) {
         o.customer_name,
         o.customer_phone,
         formatAddress(o.address as Address),
+        o.a5_sheets ?? 0,
         o.total_sheets,
         o.free_sheets,
         o.shipping_fee,
@@ -59,7 +60,10 @@ export async function GET(req: Request) {
   }
 
   const [orders, items, customers, settings] = await Promise.all([all("orders"), all("order_items"), all("customers"), all("settings")]);
-  return new Response(JSON.stringify({ exportedAt: new Date().toISOString(), orders, order_items: items, customers, settings }, null, 1), {
+  // ร้าน A5 (สินค้า ลาย รายการในออเดอร์)
+  const shopTables = ["order_a5_items", "shop_categories", "designers", "shop_products", "shop_product_sizes", "shop_designs"];
+  const shop = Object.fromEntries(await Promise.all(shopTables.map(async (t) => [t, await all(t)] as const)));
+  return new Response(JSON.stringify({ exportedAt: new Date().toISOString(), orders, order_items: items, customers, settings, ...shop }, null, 1), {
     headers: {
       "Content-Type": "application/json; charset=utf-8",
       "Content-Disposition": `attachment; filename="yimwann-backup-${stamp}.json"`,

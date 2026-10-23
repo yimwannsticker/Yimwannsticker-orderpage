@@ -1,6 +1,7 @@
 import { requireStaff } from "@/lib/server/auth";
 import { lineLoginEnabled, messagingEnabled } from "@/lib/server/line";
 import { getSettings } from "@/lib/server/settings";
+import { imageUrl } from "@/lib/server/storage";
 import { SettingsForm } from "./form";
 
 export default async function SettingsPage() {
@@ -13,5 +14,8 @@ export default async function SettingsPage() {
     slipok: Boolean(process.env.SLIPOK_API_KEY),
     easyslip: Boolean(process.env.EASYSLIP_API_KEY),
   };
-  return <SettingsForm initial={settings} env={env} />;
+  const bannerUrls = Object.fromEntries(
+    await Promise.all(settings.banners.map(async (b) => [b.path, (await imageUrl(b.path)) ?? ""] as const)),
+  );
+  return <SettingsForm initial={settings} env={env} bannerUrls={bannerUrls} />;
 }

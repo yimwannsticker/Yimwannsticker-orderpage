@@ -5,6 +5,7 @@ import { useRef, useState } from "react";
 import { PaymentInfo, SlipUploader } from "@/components/order/PaymentBox";
 import { validateFile } from "@/components/order/useArtworkUploader";
 import { Alert, CheckBadge, CheckDetails, Spinner } from "@/components/ui";
+import { addToCart } from "@/lib/client/cart";
 import { processArtwork } from "@/lib/client/file-tools";
 import { ACCEPT_ATTR } from "@/lib/constants";
 import { applySize, type StickerSize } from "@/lib/sticker-size";
@@ -124,5 +125,22 @@ export function SlipReupload({ token, settings, amount }: { token: string; setti
         {busy ? <Spinner /> : "ส่งสลิปใหม่"}
       </button>
     </div>
+  );
+}
+
+/** สั่งสติกเกอร์ A5 ชุดเดิมอีกครั้ง: ใส่ตะกร้าแล้วไปหน้าตะกร้า (ลายที่ปิดขายจะแจ้งในตะกร้า) */
+export function ReorderA5Button({ lines }: { lines: { productId: string; designId: string; sizeId: string | null; qty: number }[] }) {
+  const router = useRouter();
+  return (
+    <button
+      type="button"
+      className="btn-secondary w-full"
+      onClick={() => {
+        addToCart(lines);
+        router.push("/cart");
+      }}
+    >
+      ↻ สั่งสติกเกอร์ A5 ชุดนี้อีกครั้ง
+    </button>
   );
 }

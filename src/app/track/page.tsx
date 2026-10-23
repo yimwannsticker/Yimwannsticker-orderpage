@@ -33,7 +33,7 @@ function TrackForm() {
       });
       const json = await res.json();
       if (!res.ok) return setError(json.error);
-      router.push(reorder ? `/?reorder=${encodeURIComponent(json.token)}` : `/o/${json.token}`);
+      router.push(reorder ? `/print?reorder=${encodeURIComponent(json.token)}` : `/o/${json.token}`);
     } catch {
       setError("อินเทอร์เน็ตขัดข้อง กรุณาลองใหม่");
     } finally {

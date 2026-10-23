@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 
 /** "track" = หน้าที่อยู่ (รับเลขพัสดุทาง LINE) · "signin" = หน้าแรก สำหรับลูกค้าเก่าที่เครื่องนี้ยังไม่รู้จัก */
-export function LineLoginCard({ variant = "track" }: { variant?: "track" | "signin" }) {
+export function LineLoginCard({ variant = "track", back = "/" }: { variant?: "track" | "signin"; back?: string }) {
   const [state, setState] = useState<{ enabled: boolean; user: { name: string; picture?: string } | null } | null>(null);
 
   useEffect(() => {
@@ -22,7 +22,7 @@ export function LineLoginCard({ variant = "track" }: { variant?: "track" | "sign
           <p className="font-semibold">เคยสั่งแล้ว? เข้าสู่ระบบด้วย LINE</p>
           <p className="text-muted">เห็นไฟล์เดิม ที่อยู่เดิม และยอดสะสมทันที ใช้ได้ทุกเครื่อง</p>
         </div>
-        <a href="/api/line/login?back=%2F" className="btn btn-sm shrink-0 bg-[#06C755] text-white hover:bg-[#05b34c]">
+        <a href={`/api/line/login?back=${encodeURIComponent(back)}`} className="btn btn-sm shrink-0 bg-[#06C755] text-white hover:bg-[#05b34c]">
           LINE
         </a>
       </div>
@@ -59,7 +59,7 @@ export function LineLoginCard({ variant = "track" }: { variant?: "track" | "sign
         เข้าสู่ระบบด้วย LINE แล้วร้านจะส่งเลขพัสดุให้อัตโนมัติเมื่อจัดส่ง และครั้งหน้าเข้าด้วย LINE จากเครื่องไหนก็เห็นไฟล์เดิม ที่อยู่เดิม
         ถ้าไม่เข้าสู่ระบบ ดูเลขพัสดุได้ที่หน้าเช็คสถานะ
       </p>
-      <a href="/api/line/login?back=%2F%3Fstep%3Daddress" className="btn mt-3 w-full bg-[#06C755] text-white hover:bg-[#05b34c]">
+      <a href="/api/line/login?back=%2Fprint%3Fstep%3Daddress" className="btn mt-3 w-full bg-[#06C755] text-white hover:bg-[#05b34c]">
         เข้าสู่ระบบด้วย LINE
       </a>
     </div>

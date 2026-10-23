@@ -11,6 +11,7 @@ export function mergeSettings(data: Partial<Settings> | null | undefined): Setti
     promo: { ...DEFAULT_SETTINGS.promo, ...(d.promo ?? {}) },
     slipVerify: { ...DEFAULT_SETTINGS.slipVerify, ...(d.slipVerify ?? {}) },
     tiers: d.tiers?.length ? d.tiers : DEFAULT_SETTINGS.tiers,
+    a5Tiers: d.a5Tiers?.length ? d.a5Tiers : DEFAULT_SETTINGS.a5Tiers,
   };
 }
 

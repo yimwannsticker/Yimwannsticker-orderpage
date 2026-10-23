@@ -15,6 +15,8 @@ export default async function PanelLayout({ children }: { children: React.ReactN
     { href: "/admin/tracking-import", label: "นำเข้าเลขแทร็ค" },
     ...(isAdmin
       ? [
+          { href: "/admin/shop", label: "สินค้า A5" },
+          { href: "/admin/reports", label: "รายงาน" },
           { href: "/admin/customers", label: "ลูกค้า" },
           { href: "/admin/settings", label: "ตั้งค่า" },
           { href: "/admin/staff", label: "พนักงาน" },

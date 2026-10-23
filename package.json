@@ -16,6 +16,8 @@
     "@supabase/supabase-js": "^2.118.0",
     "ag-psd": "^31.0.3",
     "aws4fetch": "^1.0.20",
+    "html-to-image": "^1.11.13",
+    "jspdf": "^4.2.1",
     "next": "16.4.2",
     "nodemailer": "^10.1.7",
     "papaparse": "^5.7.0",
@@ -26,7 +28,8 @@
     "react": "19.3.0",
     "react-dom": "19.3.0",
     "read-excel-file": "^9.3.12",
-    "server-only": "^0.0.1"
+    "server-only": "^0.0.1",
+    "write-excel-file": "^4.1.1"
   },
   "devDependencies": {
     "@netlify/plugin-nextjs": "^5.16.4",

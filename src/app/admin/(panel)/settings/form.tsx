@@ -3,7 +3,9 @@
 import { useState, useTransition } from "react";
 import { Spinner } from "@/components/ui";
 import { parseMessageLines } from "@/lib/greeting";
-import type { PriceTier, Settings } from "@/lib/types";
+import { uploadImages } from "@/lib/client/catalog-upload";
+import type { A5Tier, PriceTier, Settings } from "@/lib/types";
+import { Sortable } from "../sortable";
 import { updateSettings } from "../../actions";
 import { ResultNote } from "../ui";
 
@@ -86,8 +88,11 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 export function SettingsForm({
   initial,
   env,
+  bannerUrls,
 }: {
   initial: Settings;
+  /** ลิงก์รูปแบนเนอร์ที่บันทึกไว้แล้ว */
+  bannerUrls: Record<string, string>;
   env: { lineLogin: boolean; lineMessaging: boolean; smtp: boolean; slipok: boolean; easyslip: boolean };
 }) {
   const [s, setS] = useState<Settings>(initial);
@@ -155,6 +160,8 @@ export function SettingsForm({
           <Num label="ค่าบริการแก้ไฟล์ (ต่อไฟล์)" value={s.fixFileFee} onChange={(v) => set("fixFileFee", v)} suffix="บาท" />
         </div>
       </Section>
+
+      <A5Section s={s} set={set} bannerUrls={bannerUrls} />
 
       <Section title="ค่าส่ง">
         <div className="grid gap-4 sm:grid-cols-2">
@@ -275,5 +282,118 @@ export function SettingsForm({
         </div>
       </div>
     </form>
+  );
+}
+
+/** ราคาส่ง A5 ค่าส่ง A5 และแบนเนอร์หน้าแรก */
+function A5Section({
+  s,
+  set,
+  bannerUrls,
+}: {
+  s: Settings;
+  set: <K extends keyof Settings>(k: K, v: Settings[K]) => void;
+  bannerUrls: Record<string, string>;
+}) {
+  const [urls, setUrls] = useState(bannerUrls);
+  const [busy, setBusy] = useState(false);
+  const setTier = (i: number, p: Partial<A5Tier>) => set("a5Tiers", s.a5Tiers.map((t, idx) => (idx === i ? { ...t, ...p } : t)));
+  const tiers = [...s.a5Tiers].sort((a, b) => a.min - b.min);
+
+  async function addBanners(files: FileList | null) {
+    if (!files?.length) return;
+    setBusy(true);
+    try {
+      const up = await uploadImages([...files], { max: 1600, thumb: 800 });
+      setUrls((u) => ({ ...u, ...Object.fromEntries(up.map((x) => [x.path, x.url])) }));
+      set("banners", [...s.banners, ...up.map((x) => ({ path: x.path, link: "" }))]);
+    } catch (e) {
+      alert((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <>
+      <Section title="สติกเกอร์สำเร็จรูป A5: ราคาส่ง">
+        <p className="text-sm text-muted">หาขั้นราคาจาก “จำนวนแผ่น A5 รวมทุกสินค้าทุกลายในตะกร้า” (คิดแยกจากงานพิมพ์ไฟล์ A3+) ส่วนต่างตามขนาดตั้งในหน้าสินค้า</p>
+        <table className="w-full max-w-md text-sm">
+          <thead className="text-left text-muted">
+            <tr>
+              <th className="py-1 font-medium">ตั้งแต่ (แผ่น)</th>
+              <th className="font-medium">ราคา/แผ่น (บาท)</th>
+              <th />
+            </tr>
+          </thead>
+          <tbody>
+            {s.a5Tiers.map((t, i) => (
+              <tr key={i}>
+                <td className="py-1 pr-2">
+                  <input className="input" inputMode="numeric" value={t.min} onChange={(e) => setTier(i, { min: Number(e.target.value) })} />
+                </td>
+                <td className="pr-2">
+                  <input className="input" inputMode="decimal" value={t.price} onChange={(e) => setTier(i, { price: Number(e.target.value) })} />
+                </td>
+                <td>
+                  <button type="button" className="btn-ghost btn-sm" onClick={() => set("a5Tiers", s.a5Tiers.filter((_, idx) => idx !== i))} disabled={s.a5Tiers.length <= 1}>
+                    ลบ
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        <button
+          type="button"
+          className="btn-secondary btn-sm"
+          onClick={() => {
+            const last = tiers[tiers.length - 1];
+            set("a5Tiers", [...s.a5Tiers, { min: (last?.min ?? 0) + 50, price: last?.price ?? 0 }]);
+          }}
+        >
+          + เพิ่มขั้นราคา
+        </button>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Num label="ค่าส่ง A5" value={s.a5ShippingFee} onChange={(v) => set("a5ShippingFee", v)} suffix="บาท" />
+          <Num label="A5 ส่งฟรีเมื่อรวมตั้งแต่" value={s.a5FreeShippingMin} onChange={(v) => set("a5FreeShippingMin", v)} suffix="แผ่น" />
+        </div>
+        <p className="text-xs text-muted">
+          ออเดอร์ที่มีทั้ง A5 และ A3+: คิดค่าส่งตามเกณฑ์ของแต่ละฝั่ง แล้วเก็บอันที่แพงกว่า (ส่งกล่องเดียว) · โปรสะสมนับเฉพาะ A3+
+        </p>
+      </Section>
+
+      <Section title="แบนเนอร์หน้าแรก">
+        <p className="text-sm text-muted">แนะนำรูปแนวนอนสัดส่วน 2:1 (เช่น 1200×600) เลื่อนอัตโนมัติ ลากหรือกด ↑↓ เพื่อเรียง</p>
+        <Sortable items={s.banners} getKey={(b) => b.path} onChange={(xs) => set("banners", xs)}>
+          {(b, i, handle) => (
+            <div className="flex items-center gap-2 rounded-2xl border border-line p-2">
+              {handle}
+              <div className="h-16 w-32 shrink-0 overflow-hidden rounded-xl bg-gray-50">
+                {urls[b.path] && (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={urls[b.path]} alt="" className="h-full w-full object-cover" />
+                )}
+              </div>
+              <input
+                className="input"
+                placeholder="ลิงก์เมื่อกด (ไม่บังคับ) เช่น /p/รหัสสินค้า"
+                value={b.link}
+                aria-label={`ลิงก์แบนเนอร์ ${i + 1}`}
+                onChange={(e) => set("banners", s.banners.map((x) => (x.path === b.path ? { ...x, link: e.target.value } : x)))}
+              />
+              <button type="button" className="btn-ghost btn-sm text-bad" onClick={() => set("banners", s.banners.filter((x) => x.path !== b.path))}>
+                ลบ
+              </button>
+            </div>
+          )}
+        </Sortable>
+        <label className="btn-secondary btn-sm cursor-pointer">
+          {busy ? <Spinner /> : "+ เพิ่มแบนเนอร์"}
+          <input type="file" accept="image/*" multiple className="sr-only" onChange={(e) => addBanners(e.target.files)} />
+        </label>
+        <p className="text-xs text-muted">แก้แล้วกด &quot;บันทึกการตั้งค่า&quot; ด้านล่าง</p>
+      </Section>
+    </>
   );
 }

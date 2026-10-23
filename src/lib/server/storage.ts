@@ -30,13 +30,29 @@ function objectUrl(path: string) {
   return `${base}/${path.split("/").map(encodeURIComponent).join("/")}`;
 }
 
-async function presign(method: "GET" | "PUT", path: string, expires: number, query?: Record<string, string>) {
+async function presign(
+  method: "GET" | "PUT",
+  path: string,
+  expires: number,
+  query?: Record<string, string>,
+  datetime?: string,
+) {
   const { client } = config();
   const url = new URL(objectUrl(path));
   url.searchParams.set("X-Amz-Expires", String(expires));
   for (const [k, v] of Object.entries(query ?? {})) url.searchParams.set(k, v);
-  const signed = await client.sign(url.toString(), { method, aws: { signQuery: true } });
+  const signed = await client.sign(url.toString(), { method, aws: { signQuery: true, ...(datetime ? { datetime } : {}) } });
   return signed.url;
+}
+
+/**
+ * ลิงก์รูปสินค้า/แบนเนอร์ในร้าน: เซ็นด้วยเวลาเที่ยงคืน (UTC) ของวันนี้ ลิงก์จึงเหมือนเดิมทั้งวัน
+ * browser แคชรูปได้ ไม่ต้องโหลดใหม่ทุกครั้งที่เปิดหน้า (ลิงก์ใช้ได้ 7 วัน)
+ */
+export function imageUrl(path: string | null | undefined) {
+  if (!path) return Promise.resolve(null);
+  const day = new Date().toISOString().slice(0, 10).replace(/-/g, "");
+  return presign("GET", path, 7 * 24 * 60 * 60, { "response-cache-control": "public, max-age=86400" }, `${day}T000000Z`);
 }
 
 /** ลิงก์ให้ browser อัปโหลดไฟล์ตรง (PUT) อายุ 2 ชั่วโมง */

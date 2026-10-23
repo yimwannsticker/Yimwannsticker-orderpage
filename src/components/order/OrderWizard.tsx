@@ -1,7 +1,12 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { a5NudgeText, combineTotals, computeA5Quote } from "@/lib/a5-pricing";
+import { resolveCart } from "@/lib/cart-resolve";
+import { clearCart, getCart, useCart } from "@/lib/client/cart";
+import type { ShopCatalog } from "@/lib/shop-types";
 import { productLabel, shapeLabel } from "@/lib/constants";
 import { itemCheck, perSheet, sizeText } from "@/lib/sticker-size";
 import { baht, isValidPhone, normalizePhone } from "@/lib/format";
@@ -21,6 +26,7 @@ import { WelcomeBack, type Me } from "./WelcomeBack";
 const STEPS = ["อัปโหลดไฟล์", "เลือกสติกเกอร์", "ที่อยู่จัดส่ง", "สรุปและชำระเงิน"];
 const STEP_KEYS = ["upload", "items", "address", "summary"];
 const DRAFT_KEY = "yw_draft_v1";
+const STEP_ADDRESS = 2;
 
 interface ReorderData {
   orderNo: string;
@@ -77,20 +83,31 @@ function initialState() {
           ? "เชื่อมต่อ LINE ไม่สำเร็จ สั่งต่อได้ตามปกติ"
           : null;
   const reorder = params.get("reorder");
-  if (!d) return { items: [] as DraftItem[], customer: EMPTY_CUSTOMER, step: 0, notice, reorder };
   const want = STEP_KEYS.indexOf(params.get("step") ?? "");
+  // มาจากตะกร้าที่มีแต่สติกเกอร์ A5: เริ่มที่ขั้นที่อยู่ได้เลย
+  const hasA5 = getCart().length > 0;
+  if (!d) return { items: [] as DraftItem[], customer: EMPTY_CUSTOMER, step: hasA5 && want >= STEP_ADDRESS ? want : 0, notice, reorder };
+  const step = Math.min(want >= 0 ? want : d.step, d.items.length || hasA5 ? 3 : 0);
   return {
     items: d.items,
     customer: { ...EMPTY_CUSTOMER, ...d.customer, address: { ...EMPTY_CUSTOMER.address, ...d.customer?.address } },
-    step: Math.min(want >= 0 ? want : d.step, d.items.length ? 3 : 0),
+    // ไม่มีไฟล์ A3+ ข้ามขั้นอัปโหลด/เลือกสติกเกอร์
+    step: !d.items.length && hasA5 && step > 0 && step < STEP_ADDRESS ? STEP_ADDRESS : step,
     notice,
     reorder,
   };
 }
 
 /** หน้าสั่งพิมพ์ (render เฉพาะใน browser เพราะต้องอ่านร่างออเดอร์จาก localStorage) */
-export function OrderWizard({ settings }: { settings: PublicSettings }) {
+export function OrderWizard({ settings, catalog }: { settings: PublicSettings; catalog: ShopCatalog }) {
   const [init] = useState(initialState);
+  const router = useRouter();
+  // สติกเกอร์สำเร็จรูป A5 ในตะกร้า (สั่งรวมในออเดอร์เดียวกัน)
+  const cartLines = useCart();
+  const a5Resolved = useMemo(() => resolveCart(cartLines, catalog), [cartLines, catalog]);
+  const a5Ok = a5Resolved.filter((r) => !r.problem);
+  const a5Bad = a5Resolved.length - a5Ok.length;
+  const a5q = useMemo(() => computeA5Quote(settings, a5Ok.map((r) => ({ qty: r.line.qty, surcharge: r.size?.surcharge ?? 0 }))), [settings, a5Ok]);
   const [items, setItems] = useState<DraftItem[]>(init.items);
   const [customer, setCustomer] = useState<CustomerForm>(init.customer);
   const [step, setStep] = useState(init.step);
@@ -115,7 +132,7 @@ export function OrderWizard({ settings }: { settings: PublicSettings }) {
 
   // ล้างพารามิเตอร์ออกจาก URL หลังอ่านแล้ว (ทำใน effect เพราะ initializer อาจถูกเรียกซ้ำ)
   useEffect(() => {
-    if (window.location.search) window.history.replaceState(null, "", "/");
+    if (window.location.search) window.history.replaceState(null, "", "/print");
   }, []);
 
   // สั่งซ้ำแบบเดิม: โหลดรายการและที่อยู่จากออเดอร์เก่า
@@ -264,6 +281,10 @@ export function OrderWizard({ settings }: { settings: PublicSettings }) {
 
   const prevPoints = (points?.points ?? 0) + (points?.pending ?? 0);
   const quote = useMemo(() => computeQuote(settings, items, step === 3 ? prevPoints : 0), [settings, items, step, prevPoints]);
+  // ยอดรวมออเดอร์ = งาน A3+ (logic เดิม) + A5 ค่าส่งเก็บฝั่งที่แพงกว่า
+  const totals = combineTotals(quote, a5q);
+  // ออเดอร์มีแต่ A5: ซ่อนขั้นอัปโหลด/เลือกสติกเกอร์
+  const a5Only = !items.length && a5Ok.length > 0 && step >= STEP_ADDRESS;
 
   // แผ่นแถม: ใช้ค่าที่ลูกค้าแบ่งเองถ้ายังรวมได้ครบ ไม่งั้นใช้ค่าเริ่มต้น
   const allocation = useMemo(() => {
@@ -316,6 +337,7 @@ export function OrderWizard({ settings }: { settings: PublicSettings }) {
   function next() {
     if (step === 0) {
       if (busy) return setError("กรุณารอให้อัปโหลดและตรวจไฟล์เสร็จก่อน");
+      if (!doneItems.length && a5Ok.length) return go(STEP_ADDRESS);
       if (!doneItems.length) return setError("กรุณาอัปโหลดไฟล์อย่างน้อย 1 ไฟล์");
       setItems((xs) => xs.filter((x) => x.status === "done"));
       return go(1);
@@ -349,12 +371,16 @@ export function OrderWizard({ settings }: { settings: PublicSettings }) {
 
   async function submit() {
     setError(null);
-    const v = validateItems(
-      settings,
-      withFree.map((i) => ({ ...i, checkLevel: i.source?.prevApproved ? null : itemCheck(i, settings)?.level })),
-      quote.freeSheets,
-    );
-    if (!v.ok) return setError(v.message!);
+    if (!items.length && !a5Ok.length) return setError("ยังไม่มีสินค้าในออเดอร์");
+    if (a5Bad) return setError("มีสติกเกอร์ A5 ที่ปิดขายแล้ว กรุณาลบออกในตะกร้าก่อน");
+    if (items.length) {
+      const v = validateItems(
+        settings,
+        withFree.map((i) => ({ ...i, checkLevel: i.source?.prevApproved ? null : itemCheck(i, settings)?.level })),
+        quote.freeSheets,
+      );
+      if (!v.ok) return setError(v.message!);
+    }
     if (!slip) return setError("กรุณาแนบสลิปการโอนเงิน");
     if (!consent) return setError("กรุณาติ๊กยอมรับนโยบายความเป็นส่วนตัว");
     setSubmitting(true);
@@ -382,10 +408,11 @@ export function OrderWizard({ settings }: { settings: PublicSettings }) {
                 : { token: i.source.token, itemId: i.source.itemId }
               : null,
           })),
+          a5: a5Ok.map((r) => ({ designId: r.line.designId, sizeId: r.line.sizeId, qty: r.line.qty })),
           customer: { ...customer, phone },
           slipUploadId: slip.uploadId,
           consent,
-          expectedTotal: quote.total,
+          expectedTotal: totals.total,
         }),
       });
       const json = await res.json();
@@ -399,6 +426,7 @@ export function OrderWizard({ settings }: { settings: PublicSettings }) {
         return;
       }
       localStorage.removeItem(DRAFT_KEY);
+      clearCart();
       setDone(json);
       topRef.current?.scrollIntoView({ behavior: "smooth" });
     } catch {
@@ -433,18 +461,33 @@ export function OrderWizard({ settings }: { settings: PublicSettings }) {
 
   return (
     <div ref={topRef} className="mx-auto max-w-xl scroll-mt-4 px-4 pb-40 pt-4">
-      <header className="mb-4 flex items-center justify-between">
-        <div>
-          <p className="text-lg font-bold text-brand-600">{settings.shopName}</p>
-          <p className="text-sm text-muted">สั่งพิมพ์สติกเกอร์ {settings.sheetName}</p>
-        </div>
-        <Link href="/track" className="btn-ghost btn-sm">
-          เช็คสถานะ
+      <header className="mb-4 flex items-center justify-between gap-2">
+        <Link href="/" className="min-w-0">
+          <p className="text-lg font-bold text-brand-600">‹ {settings.shopName}</p>
+          <p className="text-sm text-muted">{a5Only ? "ชำระเงิน" : `สั่งพิมพ์สติกเกอร์ ${settings.sheetName}`}</p>
         </Link>
+        <div className="flex shrink-0 gap-1">
+          <Link href="/cart" className="btn-ghost btn-sm">
+            🛒 ตะกร้า
+          </Link>
+          <Link href="/track" className="btn-ghost btn-sm">
+            เช็คสถานะ
+          </Link>
+        </div>
       </header>
       <div className="mb-5">
-        <Stepper steps={STEPS} current={step} />
+        {a5Only ? <Stepper steps={["ตะกร้า", STEPS[2], STEPS[3]]} current={step - 1} /> : <Stepper steps={STEPS} current={step} />}
       </div>
+      {a5Ok.length > 0 && step < STEP_ADDRESS && (
+        <div className="mb-4">
+          <Alert tone="info">
+            ในตะกร้ามีสติกเกอร์สำเร็จรูป A5 {a5q.sheets} แผ่น จะรวมส่งในออเดอร์นี้ ·{" "}
+            <Link href="/cart" className="font-semibold underline">
+              ดูตะกร้า
+            </Link>
+          </Alert>
+        </div>
+      )}
       {notice && (
         <div className="mb-4">
           <Alert tone="ok">{notice}</Alert>
@@ -465,7 +508,7 @@ export function OrderWizard({ settings }: { settings: PublicSettings }) {
               onLogout={logout}
             />
           )}
-          {!me && <LineLoginCard variant="signin" />}
+          {!me && <LineLoginCard variant="signin" back="/print" />}
           <h1 className="text-xl font-bold">อัปโหลดไฟล์งาน</h1>
           <Dropzone onFiles={onFiles} maxMb={settings.maxFileMb} />
           <button type="button" className="btn-secondary w-full" onClick={() => setPicker(true)}>
@@ -516,6 +559,35 @@ export function OrderWizard({ settings }: { settings: PublicSettings }) {
         <section className="space-y-4">
           <h1 className="text-xl font-bold">สรุปและชำระเงิน</h1>
           <div className="card space-y-3">
+            {a5Ok.length > 0 && (
+              <div className="space-y-2 border-b border-line pb-3">
+                <p className="text-sm font-bold">
+                  สติกเกอร์สำเร็จรูป A5 · {a5q.sheets} แผ่น × {baht(a5q.tier.price)}
+                  <Link href="/cart" className="ml-2 text-xs font-normal text-brand-600 underline">
+                    แก้ไข
+                  </Link>
+                </p>
+                {a5Ok.map((r, idx) => (
+                  <div key={idx} className="flex items-center gap-2.5 text-sm">
+                    <div className="h-10 w-10 shrink-0 overflow-hidden rounded-lg bg-gray-50">
+                      {r.design?.thumbUrl && (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={r.design.thumbUrl} alt="" className="h-full w-full object-contain" />
+                      )}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate">{r.product!.name}</p>
+                      <p className="text-xs text-muted">
+                        {r.design!.sku} {r.design!.name}
+                        {r.size && ` · ${r.size.name}`}
+                      </p>
+                    </div>
+                    <span className="shrink-0 text-muted">×{r.line.qty}</span>
+                    <span className="w-16 shrink-0 text-right font-semibold">{baht(a5q.lines[idx]?.lineTotal ?? 0)}</span>
+                  </div>
+                ))}
+              </div>
+            )}
             {withFree.map((it, idx) => (
               <div key={it.key} className="flex gap-3 border-b border-line pb-3 last:border-0 last:pb-0">
                 <div className="h-14 w-14 shrink-0 overflow-hidden rounded-xl bg-gray-50">
@@ -541,19 +613,20 @@ export function OrderWizard({ settings }: { settings: PublicSettings }) {
               </div>
             ))}
             <div className="space-y-1 border-t border-line pt-3 text-sm">
-              <Row label={`รวม ${quote.totalSheets} แผ่น`} value={baht(quote.subtotal)} />
+              {a5q.sheets > 0 && <Row label={`สติกเกอร์ A5 ${a5q.sheets} แผ่น`} value={baht(a5q.subtotal)} />}
+              {quote.totalSheets > 0 && <Row label={`งานพิมพ์ ${settings.sheetName} ${quote.totalSheets} แผ่น`} value={baht(quote.subtotal)} />}
               {quote.fixFeeTotal > 0 && <Row label="ค่าบริการแก้ไฟล์" value={baht(quote.fixFeeTotal)} />}
-              <Row label="ค่าส่ง" value={quote.shipping ? baht(quote.shipping) : "ส่งฟรี"} />
+              <Row label="ค่าส่ง" value={totals.shipping ? baht(totals.shipping) : "ส่งฟรี"} />
               {quote.freeSheets > 0 && <Row label="แผ่นแถม" value={`${quote.freeSheets} แผ่น`} />}
               <div className="flex items-center justify-between pt-2 text-lg font-bold">
                 <span>ยอดชำระ</span>
-                <span className="text-brand-600">{baht(quote.total)}</span>
+                <span className="text-brand-600">{baht(totals.total)}</span>
               </div>
             </div>
           </div>
 
           <PromoBox
-            enabled={settings.promo.enabled}
+            enabled={settings.promo.enabled && items.length > 0}
             loading={!points}
             points={points?.points ?? 0}
             free={quote.freeSheets}
@@ -565,8 +638,8 @@ export function OrderWizard({ settings }: { settings: PublicSettings }) {
           />
 
           <div className="card space-y-3">
-            <h2 className="font-bold">ชำระเงิน {baht(quote.total)}</h2>
-            <PaymentInfo settings={settings} amount={quote.total} />
+            <h2 className="font-bold">ชำระเงิน {baht(totals.total)}</h2>
+            <PaymentInfo settings={settings} amount={totals.total} />
             <SlipUploader value={slip} onChange={setSlip} />
           </div>
 
@@ -593,20 +666,28 @@ export function OrderWizard({ settings }: { settings: PublicSettings }) {
               {visibleError}
             </p>
           )}
-          {step >= 1 && quote.totalSheets > 0 && (
+          {step >= 1 && (quote.totalSheets > 0 || a5q.sheets > 0) && (
             <div className="mb-2">
               <div className="flex items-baseline justify-between">
                 <span className="text-sm text-muted">
-                  รวม {quote.totalSheets} แผ่น {quote.shipping ? `· ค่าส่ง ${quote.shipping}` : "· ส่งฟรี"}
+                  {[quote.totalSheets ? `${settings.sheetName} ${quote.totalSheets} แผ่น` : null, a5q.sheets ? `A5 ${a5q.sheets} แผ่น` : null]
+                    .filter(Boolean)
+                    .join(" + ")}{" "}
+                  {totals.shipping ? `· ค่าส่ง ${totals.shipping}` : "· ส่งฟรี"}
                 </span>
-                <span className="text-lg font-bold">{baht(quote.total)}</span>
+                <span className="text-lg font-bold">{baht(totals.total)}</span>
               </div>
               {quote.nudge && <p className="text-sm font-medium text-brand-600">✨ {nudgeText(quote.nudge)}</p>}
+              {a5q.nudge && step >= STEP_ADDRESS && <p className="text-sm font-medium text-brand-600">✨ {a5NudgeText(a5q.nudge)}</p>}
             </div>
           )}
           <div className="flex gap-2">
             {step > 0 && (
-              <button type="button" className="btn-secondary" onClick={() => go(step - 1)}>
+              <button
+                type="button"
+                className="btn-secondary"
+                onClick={() => (step === STEP_ADDRESS && !items.length ? router.push("/cart") : go(step - 1))}
+              >
                 ย้อนกลับ
               </button>
             )}

@@ -258,6 +258,15 @@ export async function updateSettings(data: Settings): Promise<Result> {
   s.tiers = [...s.tiers].sort((a, b) => a.min - b.min);
   s.welcomeMessages = parseMessageLines((s.welcomeMessages ?? []).join("\n"));
   s.thankYouMessages = parseMessageLines((s.thankYouMessages ?? []).join("\n"));
+  if (!s.a5Tiers.length || s.a5Tiers.some((t) => !(t.min > 0) || !(t.price >= 0)))
+    return { ok: false, error: "ตารางราคา A5 ไม่ถูกต้อง" };
+  if (new Set(s.a5Tiers.map((t) => t.min)).size !== s.a5Tiers.length) return { ok: false, error: "จำนวนแผ่นในตารางราคา A5 ซ้ำกัน" };
+  s.a5Tiers = [...s.a5Tiers].sort((a, b) => a.min - b.min);
+  if (!(s.a5ShippingFee >= 0) || !(s.a5FreeShippingMin >= 0)) return { ok: false, error: "ค่าส่ง A5 ไม่ถูกต้อง" };
+  s.banners = (s.banners ?? [])
+    .filter((b) => /^catalog\/[0-9a-f-]{36}\.(webp|jpg|png)$/.test(b.path))
+    .slice(0, 10)
+    .map((b) => ({ path: b.path, link: String(b.link ?? "").trim().slice(0, 300) }));
   if (s.maxFileMb > 200) return { ok: false, error: "ขนาดไฟล์สูงสุด 200MB (ตามที่ตั้ง bucket ไว้)" };
   await saveSettings(s);
   revalidatePath("/", "layout");

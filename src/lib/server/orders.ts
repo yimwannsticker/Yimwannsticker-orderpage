@@ -16,6 +16,9 @@ export interface OrderRow {
   address: Address;
   line_user_id: string | null;
   total_sheets: number;
+  /** สติกเกอร์สำเร็จรูป A5 (0 = ไม่มี) */
+  a5_sheets?: number;
+  a5_subtotal?: number;
   free_sheets: number;
   subtotal: number;
   fix_fee_total: number;
@@ -83,6 +86,32 @@ export async function getOrderByToken(token: string) {
   if (!token || token.length < 10) return null;
   const { data } = await db().from("orders").select("*").eq("token", token).maybeSingle();
   return (data as OrderRow) ?? null;
+}
+
+export interface A5ItemRow {
+  id: string;
+  order_id: string;
+  position: number;
+  product_id: string | null;
+  design_id: string | null;
+  size_id: string | null;
+  product_name: string;
+  design_name: string;
+  size_name: string | null;
+  sku: string;
+  designer_id: string | null;
+  designer_name: string | null;
+  thumb_path: string | null;
+  qty: number;
+  unit_price: number;
+  line_total: number;
+  picked_at: string | null;
+}
+
+/** รายการ A5 ของออเดอร์ เรียงตาม SKU (หยิบของง่าย) */
+export async function getA5Items(orderId: string) {
+  const { data } = await db().from("order_a5_items").select("*").eq("order_id", orderId);
+  return ((data as A5ItemRow[]) ?? []).sort((a, b) => a.sku.localeCompare(b.sku, "th", { numeric: true }));
 }
 
 export async function getItems(orderId: string) {
