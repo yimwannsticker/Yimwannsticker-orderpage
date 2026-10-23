@@ -8,11 +8,12 @@ import { sameLine, setCart, updateDraftItems, useCart, useDraftItems } from "@/l
 import { productLabel, shapeLabel } from "@/lib/constants";
 import { baht } from "@/lib/format";
 import { computeQuote, itemProblem, nudgeText } from "@/lib/pricing";
-import { quoteLineFor, type ShopCatalog } from "@/lib/shop-types";
+import { quoteLineFor, suggestProducts, type ShopCatalog } from "@/lib/shop-types";
 import { itemCheck, sizeText } from "@/lib/sticker-size";
 import type { PublicSettings } from "@/lib/types";
 import { FileIcon } from "../ui";
 import { MiniStepper } from "./MiniStepper";
+import { ProductCard } from "./parts";
 
 export function CartView({ settings, catalog }: { settings: PublicSettings; catalog: ShopCatalog }) {
   const lines = useCart();
@@ -23,6 +24,12 @@ export function CartView({ settings, catalog }: { settings: PublicSettings; cata
   const a5 = useMemo(() => computeA5Quote(settings, ok.map((r) => quoteLineFor(r.product!, r.size, r.line.qty))), [settings, ok]);
   const a3q = useMemo(() => computeQuote(settings, a3), [settings, a3]);
   const totals = combineTotals(a3q, a5);
+  // ใกล้ส่งฟรี: A5 ยังไม่ถึงยอด หรือมีแต่การ์ดที่ยังเสียค่าส่ง (เพิ่ม A5 ให้ถึงยอดก็ส่งฟรีทั้งกล่อง)
+  const nearFree = totals.shipping > 0 && !a3.length && (a5.shipping > 0 || (a5.sheets === 0 && a5.hasFixed));
+  const suggestions = useMemo(
+    () => (nearFree ? suggestProducts(catalog.products, new Set(lines.map((l) => l.productId))) : []),
+    [nearFree, catalog, lines],
+  );
   const unitOf = (r: ResolvedLine) => a5.lines[ok.indexOf(r)]?.unitPrice ?? 0;
   const unitLabel = (r: ResolvedLine) => (r.product?.pricing === "fixed" ? r.product.unitLabel : "แผ่น");
 
@@ -119,6 +126,21 @@ export function CartView({ settings, catalog }: { settings: PublicSettings; cata
           })}
           {a5.nudge && <p className="px-1 text-sm font-medium text-brand-600">✨ {a5NudgeText(a5.nudge)}</p>}
           {a5.fixedNudge && totals.shipping > 0 && <p className="px-1 text-sm font-medium text-brand-600">✨ {a5NudgeText(a5.fixedNudge)}</p>}
+        </section>
+      )}
+
+      {suggestions.length > 0 && (
+        <section className="space-y-2">
+          <h2 className="text-sm font-semibold">
+            สินค้าขายดี <span className="font-normal text-muted">· คละลายได้ นับรวมยอดส่งฟรี</span>
+          </h2>
+          <div className="-mx-4 flex snap-x gap-2 overflow-x-auto px-4 pb-1">
+            {suggestions.map((p) => (
+              <div key={p.id} className="w-36 shrink-0 snap-start">
+                <ProductCard p={p} tiers={settings.a5Tiers} />
+              </div>
+            ))}
+          </div>
         </section>
       )}
 

@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useState } from "react";
 import { Alert, Spinner } from "@/components/ui";
-import { makeSku, nextSkuNumber } from "@/lib/shop-types";
+import { makeSku, monthDayLabel, nextSkuNumber } from "@/lib/shop-types";
 import { buildShopeePlans, shopeeFileKind, type ShopeeExcluded, type ShopeePlan } from "@/lib/shopee-import";
 import { readXlsxRows } from "@/lib/xlsx-read";
 import { importShopeeImages, saveProduct, shopeeImportState, type ProductInput } from "../../../shop-actions";
@@ -89,6 +89,8 @@ export function ShopeeImporter({ categories, a5BasePrice }: { categories: { id: 
       optionLabel: r.optionLabel,
       unitLabel: r.unitLabel,
       shopeeItemId: r.itemId,
+      seasonStart: r.season?.start ?? null,
+      seasonEnd: r.season?.end ?? null,
       sizes: r.sizes,
       designs,
     };
@@ -272,6 +274,18 @@ export function ShopeeImporter({ categories, a5BasePrice }: { categories: { id: 
                           .join(", ")}`}
                     </p>
                     {r.description && <p className="text-xs text-muted">{r.description}</p>}
+                    {r.season && (
+                      <p className="flex items-center gap-2 text-xs">
+                        <span className="rounded bg-ok-bg px-1.5 py-0.5 text-ok">
+                          ขายช่วงเทศกาล {monthDayLabel(r.season.start)} – {monthDayLabel(r.season.end)}
+                        </span>
+                        {!(busy || r.imported || r.done === "ok") && (
+                          <button type="button" className="text-muted underline" onClick={() => update(r.itemId, { season: null })}>
+                            ขายตลอดปี
+                          </button>
+                        )}
+                      </p>
+                    )}
                     <div className="flex flex-wrap items-center gap-2">
                       <select
                         className="input !w-auto !py-1 text-sm"

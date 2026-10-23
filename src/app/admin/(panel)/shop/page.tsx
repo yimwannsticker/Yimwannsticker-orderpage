@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { requireStaff } from "@/lib/server/auth";
+import { inSeason, monthDayLabel } from "@/lib/shop-types";
 import { imageUrl } from "@/lib/server/storage";
 import { db } from "@/lib/supabase/admin";
 import { CategoryManager, DesignerManager, ProductList } from "./client";
@@ -20,7 +21,7 @@ export default async function ShopAdminPage({ searchParams }: { searchParams: Pr
     db().from("designers").select("id, name, active").order("created_at"),
     db()
       .from("shop_products")
-      .select("id, name, category_id, designer_id, images, badge_best, badge_new, active, position, shop_designs(id, active)")
+      .select("id, name, category_id, designer_id, images, badge_best, badge_new, active, position, season_start, season_end, shop_designs(id, active)")
       .order("position"),
     db().from("shop_product_sold").select("product_id, sold"),
   ]);
@@ -72,6 +73,10 @@ export default async function ShopAdminPage({ searchParams }: { searchParams: Pr
                 badgeNew: p.badge_new,
                 active: p.active,
                 sold: soldBy.get(p.id) ?? 0,
+                season:
+                  p.season_start && p.season_end
+                    ? { label: `${monthDayLabel(p.season_start)} – ${monthDayLabel(p.season_end)}`, now: inSeason(p.season_start, p.season_end) }
+                    : null,
               };
             }),
           )}

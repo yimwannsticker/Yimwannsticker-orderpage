@@ -9,8 +9,15 @@ const thai = Noto_Sans_Thai({
 });
 
 export const metadata: Metadata = {
+  metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000"),
   title: "สั่งพิมพ์สติกเกอร์ | Yimwann Sticker",
-  description: "อัปโหลดไฟล์ เลือกสติกเกอร์ ชำระเงิน จบในหน้าเดียว",
+  description: "สติกเกอร์สำเร็จรูป A5 และสั่งพิมพ์ไฟล์ของคุณเอง A3+ เลือก ชำระเงิน จบในหน้าเดียว",
+  openGraph: {
+    siteName: "Yimwann Sticker",
+    locale: "th_TH",
+    type: "website",
+    images: ["/share-image"],
+  },
 };
 
 export const viewport: Viewport = {

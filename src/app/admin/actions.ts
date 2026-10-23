@@ -6,6 +6,7 @@ import { CARRIERS, resolveCarrier } from "@/lib/constants";
 import * as storage from "@/lib/server/storage";
 import { normalizePhone } from "@/lib/format";
 import { requireStaff, type Role } from "@/lib/server/auth";
+import { saveBackup } from "@/lib/server/backup";
 import { parseMessageLines } from "@/lib/greeting";
 import { mergeSettings, saveSettings } from "@/lib/server/settings";
 import { markShipped, removeIfUnreferenced } from "@/lib/server/orders";
@@ -326,4 +327,16 @@ export async function deleteOrderFiles(orderId: string): Promise<Result> {
   await db().from("orders").update({ files_deleted_at: new Date().toISOString(), slip_path: null }).eq("id", orderId);
   refresh(orderId);
   return { ok: true };
+}
+
+/** สำรองข้อมูลลง R2 ทันที (ปกติระบบทำเองสัปดาห์ละครั้ง) */
+export async function backupNow(): Promise<Result> {
+  await requireStaff("admin");
+  try {
+    await saveBackup();
+  } catch {
+    return { ok: false, error: "สำรองข้อมูลไม่สำเร็จ กรุณาลองใหม่" };
+  }
+  revalidatePath("/admin/settings");
+  return { ok: true, message: "สำรองข้อมูลแล้ว" };
 }

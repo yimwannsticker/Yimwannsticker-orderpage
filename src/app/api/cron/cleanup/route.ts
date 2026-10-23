@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { backupIfDue } from "@/lib/server/backup";
 import { removeIfUnreferenced } from "@/lib/server/orders";
 import { getSettings } from "@/lib/server/settings";
 import * as storage from "@/lib/server/storage";
@@ -11,6 +12,7 @@ export const maxDuration = 60;
  * 1) ลบไฟล์ของออเดอร์ที่ส่งของแล้วเกิน N วัน (ตั้งได้ในหลังบ้าน)
  * 2) ลบไฟล์ที่อัปโหลดแต่ไม่ได้สั่งจริงเกิน 3 วัน
  * 3) เขียน heartbeat กัน Supabase แพ็กเกจฟรีพักโปรเจกต์
+ * 4) สำรองข้อมูลลง R2 สัปดาห์ละครั้ง
  * ทำทีละไม่มาก ให้จบในเวลาจำกัดของโฮสต์ฟรี รอบถัดไปจะทำต่อเอง
  */
 export async function GET(req: Request) {
@@ -55,5 +57,8 @@ export async function GET(req: Request) {
 
   await db().from("lookup_attempts").delete().lt("created_at", new Date(Date.now() - 86400_000).toISOString());
 
-  return NextResponse.json({ removedOrders, removedUploads: stale?.length ?? 0 });
+  // สำรองข้อมูลอัตโนมัติสัปดาห์ละครั้ง (พลาดก็ไม่ทำให้งานลบไฟล์ล้ม)
+  const backup = await backupIfDue().catch((e) => ({ error: String(e) }));
+
+  return NextResponse.json({ removedOrders, removedUploads: stale?.length ?? 0, backup });
 }

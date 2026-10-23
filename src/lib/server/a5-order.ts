@@ -1,4 +1,5 @@
 import "server-only";
+import { inSeason } from "../shop-types";
 import { db } from "../supabase/admin";
 
 export interface A5OrderLine {
@@ -43,7 +44,7 @@ export async function loadA5Lines(raw: unknown): Promise<{ ok: true; lines: A5Or
   const { data, error } = await db()
     .from("shop_designs")
     .select(
-      "id, name, sku, thumb_path, image_path, active, shop_products(id, name, active, pricing, unit_label, designer_id, designers(name), shop_product_sizes(id, name, surcharge, price, units))",
+      "id, name, sku, thumb_path, image_path, active, shop_products(id, name, active, season_start, season_end, pricing, unit_label, designer_id, designers(name), shop_product_sizes(id, name, surcharge, price, units))",
     )
     .in("id", [...new Set(want.map((w) => w.designId))]);
   if (error) return { ok: false, error: "ตรวจรายการสติกเกอร์ A5 ไม่สำเร็จ กรุณาลองใหม่" };
@@ -59,6 +60,8 @@ export async function loadA5Lines(raw: unknown): Promise<{ ok: true; lines: A5Or
       id: string;
       name: string;
       active: boolean;
+      season_start: string | null;
+      season_end: string | null;
       pricing: "a5" | "fixed" | null;
       unit_label: string | null;
       designer_id: string | null;
@@ -72,6 +75,7 @@ export async function loadA5Lines(raw: unknown): Promise<{ ok: true; lines: A5Or
     const d = rows.find((x) => x.id === w.designId);
     const p = d?.shop_products;
     if (!d || !p || !p.active) return { ok: false, error: "มีสติกเกอร์ A5 ในตะกร้าที่ปิดขายแล้ว กรุณาลบออกในตะกร้า" };
+    if (!inSeason(p.season_start, p.season_end)) return { ok: false, error: `${p.name} หมดช่วงเทศกาลแล้ว กรุณาลบออกในตะกร้า` };
     if (!d.active) return { ok: false, error: `ลาย ${d.sku} หมดชั่วคราว กรุณาลบออกในตะกร้า` };
     const sizes = p.shop_product_sizes ?? [];
     const size = sizes.find((s) => s.id === w.sizeId) ?? null;

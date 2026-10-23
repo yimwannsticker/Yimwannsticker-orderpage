@@ -69,6 +69,8 @@ interface ProductRow {
   badgeNew: boolean;
   active: boolean;
   sold: number;
+  /** ช่วงเทศกาล เช่น "15 พ.ย. – 5 ม.ค." และตอนนี้อยู่ในช่วงไหม */
+  season: { label: string; now: boolean } | null;
 }
 
 export function ProductList({ products, categories }: { products: ProductRow[]; categories: { id: string; name: string }[] }) {
@@ -97,6 +99,12 @@ export function ProductList({ products, categories }: { products: ProductRow[]; 
         <p className="mt-0.5 flex gap-1">
           {p.badgeBest && <span className="rounded-full bg-brand-500 px-2 text-[11px] font-bold text-white">ขายดี</span>}
           {p.badgeNew && <span className="rounded-full bg-amber-400 px-2 text-[11px] font-bold text-white">ใหม่</span>}
+          {p.season && (
+            <span className={`rounded-full px-2 text-[11px] ${p.season.now ? "bg-ok-bg text-ok" : "bg-gray-100 text-muted"}`}>
+              เทศกาล {p.season.label}
+              {p.season.now ? "" : " · ตอนนี้ซ่อนอยู่"}
+            </span>
+          )}
           {!p.activeDesigns && <span className="rounded-full bg-gray-100 px-2 text-[11px] text-muted">ยังไม่มีลายเปิดขาย ไม่แสดงหน้าร้าน</span>}
         </p>
       </Link>

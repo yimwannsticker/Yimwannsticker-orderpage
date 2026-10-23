@@ -1,12 +1,13 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { Spinner } from "@/components/ui";
 import { parseMessageLines } from "@/lib/greeting";
 import { uploadImages } from "@/lib/client/catalog-upload";
 import type { A5Tier, PriceTier, Settings } from "@/lib/types";
 import { Sortable } from "../sortable";
-import { updateSettings } from "../../actions";
+import { backupNow, updateSettings } from "../../actions";
 import { ResultNote } from "../ui";
 
 type Result = { ok: true; message?: string } | { ok: false; error: string };
@@ -89,10 +90,13 @@ export function SettingsForm({
   initial,
   env,
   bannerUrls,
+  backups,
 }: {
   initial: Settings;
   /** ลิงก์รูปแบนเนอร์ที่บันทึกไว้แล้ว */
   bannerUrls: Record<string, string>;
+  /** ไฟล์สำรองอัตโนมัติใน R2 (ใหม่สุดก่อน) */
+  backups: { id: string; at: string; size: number; url: string }[];
   env: { lineLogin: boolean; lineMessaging: boolean; smtp: boolean; slipok: boolean; easyslip: boolean };
 }) {
   const [s, setS] = useState<Settings>(initial);
@@ -261,8 +265,9 @@ export function SettingsForm({
 
       <Section title="สำรองข้อมูล">
         <p className="text-sm text-muted">
-          ฐานข้อมูลแพ็กเกจฟรีไม่มีสำรองอัตโนมัติ แนะนำให้กดดาวน์โหลดเก็บไว้สัปดาห์ละครั้ง (ไฟล์งานลูกค้าเก็บแยกอยู่ใน Cloudflare R2)
+          ระบบสำรองข้อมูลทั้งหมด (ออเดอร์ ลูกค้า สินค้า การตั้งค่า) ลง Cloudflare R2 เองสัปดาห์ละครั้ง เก็บไว้ 8 ชุดล่าสุด · ดาวน์โหลดเก็บไว้ในเครื่องด้วยก็ได้
         </p>
+        <BackupList backups={backups} />
         <div className="flex flex-wrap gap-2">
           <a href="/api/admin/export?format=json" className="btn-secondary">
             ดาวน์โหลดข้อมูลทั้งหมด (สำหรับกู้คืน)
@@ -399,5 +404,50 @@ function A5Section({
         <p className="text-xs text-muted">แก้แล้วกด &quot;บันทึกการตั้งค่า&quot; ด้านล่าง</p>
       </Section>
     </>
+  );
+}
+
+function BackupList({ backups }: { backups: { id: string; at: string; size: number; url: string }[] }) {
+  const [res, setRes] = useState<Result | null>(null);
+  const [pending, start] = useTransition();
+  const router = useRouter();
+  return (
+    <div className="space-y-2">
+      {backups.length ? (
+        <ul className="divide-y divide-line rounded-xl ring-1 ring-line">
+          {backups.map((b, i) => (
+            <li key={b.id} className="flex items-center justify-between gap-2 px-3 py-2 text-sm">
+              <span>
+                {new Date(b.at).toLocaleString("th-TH", { dateStyle: "medium", timeStyle: "short", timeZone: "Asia/Bangkok" })}
+                <span className="text-muted"> · {(b.size / 1024 / 1024).toFixed(1)} MB</span>
+                {i === 0 && <span className="ml-1 rounded bg-ok-bg px-1.5 text-xs text-ok">ล่าสุด</span>}
+              </span>
+              <a href={b.url} className="font-medium text-brand-600 underline">
+                ดาวน์โหลด
+              </a>
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p className="text-sm text-muted">ยังไม่มีไฟล์สำรอง (ระบบจะสำรองครั้งแรกภายใน 1 ชั่วโมงหลังเปิดใช้)</p>
+      )}
+      <div className="flex items-center gap-3">
+        <button
+          type="button"
+          className="btn-secondary"
+          disabled={pending}
+          onClick={() =>
+            start(async () => {
+              const r = await backupNow();
+              setRes(r);
+              if (r.ok) router.refresh();
+            })
+          }
+        >
+          {pending ? <Spinner /> : "สำรองตอนนี้"}
+        </button>
+        <ResultNote res={res} />
+      </div>
+    </div>
   );
 }

@@ -6,7 +6,7 @@ import { useState, useTransition } from "react";
 import { Alert, Spinner } from "@/components/ui";
 import { ArtworkViewer } from "@/components/order/ArtworkViewer";
 import { nameFromFile, uploadImages } from "@/lib/client/catalog-upload";
-import { makeSku, nextSkuNumber } from "@/lib/shop-types";
+import { inSeason, makeSku, monthDayLabel, nextSkuNumber, SEASON_PRESETS } from "@/lib/shop-types";
 import { deleteProduct, saveProduct } from "../../../shop-actions";
 import { Sortable } from "../../sortable";
 import { Toggle } from "../client";
@@ -39,6 +39,8 @@ export interface EditorProduct {
   pricing: "a5" | "fixed";
   optionLabel: string;
   unitLabel: string;
+  seasonStart: string | null;
+  seasonEnd: string | null;
   sizes: { id?: string; key?: string; name: string; surcharge: number; price: number | null; units: number | null }[];
   designs: EditorDesign[];
 }
@@ -165,6 +167,8 @@ export function ProductEditor({
         pricing: p.pricing,
         optionLabel: p.optionLabel,
         unitLabel: p.unitLabel,
+        seasonStart: p.seasonStart,
+        seasonEnd: p.seasonEnd,
         sizes: p.sizes.map((s) => ({ id: s.id, name: s.name, surcharge: s.surcharge, price: s.price, units: s.units })),
         designs: p.designs.map((d) => ({ id: d.id, name: d.name, sku: d.sku, imagePath: d.imagePath, thumbPath: d.thumbPath, active: d.active })),
       });
@@ -248,6 +252,11 @@ export function ProductEditor({
         <Field label="รายละเอียด">
           <textarea className="input min-h-32 py-2" value={p.description} onChange={(e) => set("description", e.target.value)} />
         </Field>
+        <SeasonField
+          start={p.seasonStart}
+          end={p.seasonEnd}
+          onChange={(start, end) => setP((x) => ({ ...x, seasonStart: start, seasonEnd: end }))}
+        />
         <div className="flex flex-wrap gap-6">
           <label className="flex items-center gap-2 text-sm font-medium">
             <Toggle on={p.active} onChange={(v) => set("active", v)} label="เปิดขาย" /> เปิดขาย
@@ -457,6 +466,75 @@ export function ProductEditor({
           )}
         </div>
       </div>
+    </div>
+  );
+}
+
+const MONTHS = ["มกราคม", "กุมภาพันธ์", "มีนาคม", "เมษายน", "พฤษภาคม", "มิถุนายน", "กรกฎาคม", "สิงหาคม", "กันยายน", "ตุลาคม", "พฤศจิกายน", "ธันวาคม"];
+
+function MonthDay({ value, onChange, label }: { value: string; onChange: (v: string) => void; label: string }) {
+  const [m, d] = value.split("-");
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return (
+    <span className="flex gap-1.5">
+      <select className="input !w-20" aria-label={`วัน${label}`} value={Number(d)} onChange={(e) => onChange(`${m}-${pad(Number(e.target.value))}`)}>
+        {Array.from({ length: 31 }, (_, i) => (
+          <option key={i} value={i + 1}>
+            {i + 1}
+          </option>
+        ))}
+      </select>
+      <select className="input" aria-label={`เดือน${label}`} value={Number(m)} onChange={(e) => onChange(`${pad(Number(e.target.value))}-${d}`)}>
+        {MONTHS.map((name, i) => (
+          <option key={name} value={i + 1}>
+            {name}
+          </option>
+        ))}
+      </select>
+    </span>
+  );
+}
+
+/** ช่วงเทศกาล: ขึ้นหน้าร้านเฉพาะช่วงวันที่กำหนด วนทุกปี */
+function SeasonField({ start, end, onChange }: { start: string | null; end: string | null; onChange: (start: string | null, end: string | null) => void }) {
+  const on = Boolean(start && end);
+  const preset = SEASON_PRESETS.find((s) => s.start === start && s.end === end)?.key ?? "";
+  return (
+    <div className="space-y-2 rounded-xl bg-gray-50 p-3">
+      <label className="flex items-center gap-2 text-sm font-medium">
+        <Toggle on={on} onChange={(v) => (v ? onChange("11-15", "01-05") : onChange(null, null))} label="ขายเฉพาะช่วงเทศกาล" /> ขายเฉพาะช่วงเทศกาล
+      </label>
+      {on ? (
+        <>
+          <div className="flex flex-wrap items-center gap-2 text-sm">
+            <select
+              className="input !w-auto"
+              aria-label="เทศกาล"
+              value={preset}
+              onChange={(e) => {
+                const s = SEASON_PRESETS.find((x) => x.key === e.target.value);
+                if (s) onChange(s.start, s.end);
+              }}
+            >
+              <option value="">กำหนดเอง</option>
+              {SEASON_PRESETS.map((s) => (
+                <option key={s.key} value={s.key}>
+                  {s.label}
+                </option>
+              ))}
+            </select>
+            <MonthDay label="เริ่ม" value={start!} onChange={(v) => onChange(v, end)} />
+            <span>ถึง</span>
+            <MonthDay label="สิ้นสุด" value={end!} onChange={(v) => onChange(start, v)} />
+          </div>
+          <p className="text-xs text-muted">
+            ขึ้นหน้าร้านเองทุกปีช่วง {monthDayLabel(start!)} – {monthDayLabel(end!)} นอกช่วงนี้ซ่อนไว้ (ยังต้องเปิดขายอยู่) ·{" "}
+            {inSeason(start, end) ? "ตอนนี้อยู่ในช่วงเทศกาล ลูกค้าเห็นแล้ว" : "ตอนนี้นอกช่วงเทศกาล ลูกค้ายังไม่เห็น"}
+          </p>
+        </>
+      ) : (
+        <p className="text-xs text-muted">ขายตลอดปี</p>
+      )}
     </div>
   );
 }

@@ -131,3 +131,17 @@ alter table public.order_a5_items
   add column if not exists pricing text not null default 'a5',
   add column if not exists units int,
   add column if not exists unit_label text;
+
+-- ช่วงเทศกาล (วัน-เดือน "MM-DD" วนทุกปี) นอกช่วงนี้สินค้าไม่ขึ้นหน้าร้าน · null = ขายตลอดปี
+alter table public.shop_products
+  add column if not exists season_start text check (season_start ~ '^\d{2}-\d{2}$'),
+  add column if not exists season_end text check (season_end ~ '^\d{2}-\d{2}$');
+
+-- สำรองข้อมูลอัตโนมัติทุกสัปดาห์ (ไฟล์ JSON เก็บใน R2 โฟลเดอร์ backups/ เก็บไว้ 8 ชุดล่าสุด)
+create table if not exists public.backups (
+  id uuid primary key default gen_random_uuid(),
+  path text not null,
+  size_bytes int not null default 0,
+  created_at timestamptz not null default now()
+);
+alter table public.backups enable row level security;

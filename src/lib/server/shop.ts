@@ -1,7 +1,7 @@
 import "server-only";
 import { unstable_cache } from "next/cache";
 import { db } from "../supabase/admin";
-import type { ShopCatalog, ShopProduct } from "../shop-types";
+import { inSeason, type ShopCatalog, type ShopProduct } from "../shop-types";
 import { imageUrl } from "./storage";
 
 export const CATALOG_TAG = "catalog";
@@ -17,6 +17,8 @@ export interface ProductRow {
   option_label: string;
   unit_label: string;
   shopee_item_id: string | null;
+  season_start: string | null;
+  season_end: string | null;
   design_code: string;
   designer_id: string | null;
   images: { path: string; thumb: string }[];
@@ -38,7 +40,7 @@ export interface ProductRow {
 }
 
 const PRODUCT_SELECT =
-  "id, category_id, name, description, pieces_per_sheet, material, pricing, option_label, unit_label, shopee_item_id, design_code, designer_id, images, badge_best, badge_new, active, position, created_at, shop_product_sizes(id, name, surcharge, price, units, position), shop_designs(id, name, sku, image_path, thumb_path, active, position)";
+  "id, category_id, name, description, pieces_per_sheet, material, pricing, option_label, unit_label, shopee_item_id, season_start, season_end, design_code, designer_id, images, badge_best, badge_new, active, position, created_at, shop_product_sizes(id, name, surcharge, price, units, position), shop_designs(id, name, sku, image_path, thumb_path, active, position)";
 
 const byPos = <T extends { position: number }>(a: T, b: T) => a.position - b.position;
 
@@ -104,12 +106,13 @@ async function toProduct(p: ProductRow & { sold: number }): Promise<ShopProduct>
   };
 }
 
-/** ข้อมูลร้านพร้อมลิงก์รูป */
+/** ข้อมูลร้านพร้อมลิงก์รูป (สินค้านอกช่วงเทศกาลไม่แสดง เช็กทุกครั้งที่เปิดหน้า ไม่ขึ้นกับแคช) */
 export async function getCatalog(): Promise<ShopCatalog> {
   const c = await loadCatalog();
+  const visible = c.products.filter((p) => inSeason(p.season_start, p.season_end));
   const [categories, products] = await Promise.all([
     Promise.all(c.categories.map(async (x) => ({ id: x.id, name: x.name, iconUrl: await imageUrl(x.icon_path) }))),
-    Promise.all(c.products.map(toProduct)),
+    Promise.all(visible.map(toProduct)),
   ]);
   return { categories, products };
 }

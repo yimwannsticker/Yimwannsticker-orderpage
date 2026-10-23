@@ -107,6 +107,9 @@ export interface ProductInput {
   unitLabel: string;
   /** รหัสสินค้า Shopee (ตอนนำเข้า) */
   shopeeItemId?: string | null;
+  /** ช่วงเทศกาล "MM-DD" วนทุกปี (ไม่ใส่ทั้งคู่ = ขายตลอดปี) */
+  seasonStart?: string | null;
+  seasonEnd?: string | null;
   sizes: { id?: string; name: string; surcharge: number; price?: number | null; units?: number | null }[];
   designs: { id?: string; name: string; sku: string; imagePath: string | null; thumbPath: string | null; active: boolean }[];
 }
@@ -152,6 +155,14 @@ export async function saveProduct(input: ProductInput): Promise<Result> {
   if (pricing === "fixed" && !sizes.length) return { ok: false, error: `สินค้าราคาคงที่ต้องมี${optionLabel}อย่างน้อย 1 อย่าง พร้อมราคา` };
   if (pricing === "fixed" && sizes.some((s) => !(s.price! > 0))) return { ok: false, error: `กรุณาใส่ราคาของทุก${optionLabel}` };
 
+  const md = (s: unknown) => {
+    const m = /^(\d{2})-(\d{2})$/.exec(String(s ?? ""));
+    return m && Number(m[1]) >= 1 && Number(m[1]) <= 12 && Number(m[2]) >= 1 && Number(m[2]) <= 31 ? m[0] : null;
+  };
+  const seasonStart = md(input.seasonStart);
+  const seasonEnd = md(input.seasonEnd);
+  if (Boolean(seasonStart) !== Boolean(seasonEnd)) return { ok: false, error: "กรุณาใส่ช่วงเทศกาลให้ครบทั้งวันเริ่มและวันสิ้นสุด" };
+
   const pieces = Math.floor(Number(input.piecesPerSheet) || 0);
   const row = {
     id: productId,
@@ -164,6 +175,8 @@ export async function saveProduct(input: ProductInput): Promise<Result> {
     option_label: optionLabel,
     unit_label: pricing === "fixed" ? clean(input.unitLabel, 20) || "ชิ้น" : "แผ่น",
     ...(input.shopeeItemId ? { shopee_item_id: clean(input.shopeeItemId, 40) } : {}),
+    season_start: seasonStart,
+    season_end: seasonEnd,
     design_code: clean(input.designCode, 30),
     designer_id: isUuid(input.designerId) ? input.designerId : null,
     images: (input.images ?? []).filter((i) => isPath(i.path)).slice(0, 20).map((i) => ({ path: i.path, thumb: isPath(i.thumb) ? i.thumb : i.path })),

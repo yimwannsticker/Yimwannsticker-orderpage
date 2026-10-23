@@ -1,17 +1,7 @@
 import { getStaff } from "@/lib/server/auth";
 import { formatAddress } from "@/lib/format";
-import { db } from "@/lib/supabase/admin";
+import { allRows as all, backupData } from "@/lib/server/backup";
 import type { Address } from "@/lib/types";
-
-async function all(table: string) {
-  const rows: Record<string, unknown>[] = [];
-  for (let from = 0; ; from += 1000) {
-    const { data, error } = await db().from(table).select("*").range(from, from + 999);
-    if (error) throw error;
-    rows.push(...(data ?? []));
-    if (!data || data.length < 1000) return rows;
-  }
-}
 
 function csvCell(v: unknown) {
   const s = v === null || v === undefined ? "" : String(v);
@@ -59,11 +49,7 @@ export async function GET(req: Request) {
     });
   }
 
-  const [orders, items, customers, settings] = await Promise.all([all("orders"), all("order_items"), all("customers"), all("settings")]);
-  // ร้าน A5 (สินค้า ลาย รายการในออเดอร์)
-  const shopTables = ["order_a5_items", "shop_categories", "designers", "shop_products", "shop_product_sizes", "shop_designs"];
-  const shop = Object.fromEntries(await Promise.all(shopTables.map(async (t) => [t, await all(t)] as const)));
-  return new Response(JSON.stringify({ exportedAt: new Date().toISOString(), orders, order_items: items, customers, settings, ...shop }, null, 1), {
+  return new Response(JSON.stringify(await backupData(), null, 1), {
     headers: {
       "Content-Type": "application/json; charset=utf-8",
       "Content-Disposition": `attachment; filename="yimwann-backup-${stamp}.json"`,

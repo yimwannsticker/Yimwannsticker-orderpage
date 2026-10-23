@@ -5,6 +5,8 @@
  * - สินค้าอื่นใช้ราคาขั้นบันได A5 ส่วนต่างตามขนาดคิดจากสัดส่วนราคาใน Shopee
  */
 
+import { guessSeason } from "./shop-types";
+
 export interface ShopeePlanDesign {
   name: string;
   /** ชื่อตัวเลือกใน Shopee */
@@ -27,6 +29,8 @@ export interface ShopeePlan {
   designCode: string;
   sizes: { name: string; surcharge: number; price: number | null; units: number | null }[];
   designs: ShopeePlanDesign[];
+  /** ช่วงเทศกาลที่เดาจากชื่อสินค้า (แก้ได้) */
+  season: { start: string; end: string } | null;
   /** จำนวนตัวเลือก "ตำหนิ" ที่ตัดออก */
   skippedFlawed: number;
 }
@@ -240,6 +244,7 @@ export function buildShopeePlans(
       designCode,
       sizes,
       designs,
+      season: guessSeason(title),
       skippedFlawed,
     });
   }

@@ -116,3 +116,42 @@ export function nextSkuNumber(designCode: string, skus: string[]) {
   }
   return max + 1;
 }
+
+// ---------- ช่วงเทศกาล ----------
+
+/** วัน-เดือนปัจจุบันตามเวลาไทย "MM-DD" */
+export function bangkokMonthDay(now = new Date()) {
+  return new Date(now.getTime() + 7 * 3600_000).toISOString().slice(5, 10);
+}
+
+/** อยู่ในช่วงเทศกาลไหม (วนทุกปี ช่วงข้ามปีได้ เช่น 11-15 ถึง 01-05) · ไม่ตั้งช่วง = ขายตลอด */
+export function inSeason(start: string | null | undefined, end: string | null | undefined, today = bangkokMonthDay()) {
+  if (!start || !end) return true;
+  return start <= end ? today >= start && today <= end : today >= start || today <= end;
+}
+
+/** ช่วงเทศกาลแนะนำ (แก้ได้ในหน้าแก้สินค้า) */
+export const SEASON_PRESETS: { key: string; label: string; start: string; end: string; match: RegExp }[] = [
+  { key: "xmas-ny", label: "คริสต์มาส + ปีใหม่", start: "11-15", end: "01-05", match: /คริสต์?มา?ส|christmas|ปีใหม่|new year/i },
+  { key: "valentine", label: "วาเลนไทน์", start: "01-20", end: "02-14", match: /วาเลนไทน์|valentine/i },
+  { key: "cny", label: "ตรุษจีน", start: "01-05", end: "02-20", match: /ตรุษจีน/ },
+  { key: "songkran", label: "สงกรานต์", start: "03-15", end: "04-16", match: /สงกรานต์/ },
+  { key: "mother", label: "วันแม่", start: "07-10", end: "08-12", match: /วันแม่/ },
+  { key: "vegetarian", label: "เทศกาลกินเจ", start: "09-01", end: "10-31", match: /กินเจ|อาหารเจ/ },
+];
+
+export function guessSeason(title: string) {
+  const p = SEASON_PRESETS.find((s) => s.match.test(title));
+  return p ? { start: p.start, end: p.end } : null;
+}
+
+const TH_MONTHS = ["ม.ค.", "ก.พ.", "มี.ค.", "เม.ย.", "พ.ค.", "มิ.ย.", "ก.ค.", "ส.ค.", "ก.ย.", "ต.ค.", "พ.ย.", "ธ.ค."];
+export const monthDayLabel = (md: string) => `${Number(md.slice(3))} ${TH_MONTHS[Number(md.slice(0, 2)) - 1] ?? ""}`;
+
+/** สินค้าแนะนำในตะกร้า (ช่วยให้ถึงยอดส่งฟรี): สติกเกอร์ A5 ขายดีที่ยังไม่อยู่ในตะกร้า */
+export function suggestProducts(products: ShopProduct[], inCart: Set<string>, limit = 8) {
+  return products
+    .filter((p) => p.pricing === "a5" && !inCart.has(p.id) && p.designs.some((d) => d.active))
+    .sort((a, b) => b.sold - a.sold || Number(b.badgeBest) - Number(a.badgeBest) || a.position - b.position)
+    .slice(0, limit);
+}

@@ -30,6 +30,8 @@ export default async function ProductEditPage({ params }: { params: Promise<{ id
     pricing: "a5",
     optionLabel: "ขนาด",
     unitLabel: "แผ่น",
+    seasonStart: null,
+    seasonEnd: null,
     sizes: [],
     designs: [],
   };
@@ -61,6 +63,8 @@ export default async function ProductEditPage({ params }: { params: Promise<{ id
       pricing: p.pricing ?? "a5",
       optionLabel: p.option_label || "ขนาด",
       unitLabel: p.unit_label || "แผ่น",
+      seasonStart: p.season_start,
+      seasonEnd: p.season_end,
       sizes: [...p.shop_product_sizes]
         .sort((a, b) => a.position - b.position)
         .map((s) => ({ id: s.id, name: s.name, surcharge: Number(s.surcharge), price: s.price === null ? null : Number(s.price), units: s.units })),
