@@ -11,6 +11,8 @@ export interface PickItem {
   designName: string;
   sizeName: string | null;
   qty: number;
+  /** หน่วย (สินค้าราคาคงที่ เช่น แพ็ค) */
+  unit?: string | null;
   thumbUrl: string | null;
   picked: boolean;
 }
@@ -22,7 +24,7 @@ export function PickList({ orderId, items: initial }: { orderId: string; items: 
   const [, start] = useTransition();
   const done = items.filter((i) => i.picked).length;
   const all = done === items.length;
-  const sheets = items.reduce((a, i) => a + i.qty, 0);
+  const sheets = items.reduce((a, i) => a + (i.unit ? 0 : i.qty), 0);
 
   const toggle = (id: string, picked: boolean) => {
     setItems((xs) => xs.map((x) => (x.id === id ? { ...x, picked } : x)));
@@ -72,11 +74,17 @@ export function PickList({ orderId, items: initial }: { orderId: string; items: 
                 {i.sizeName && ` · ${i.sizeName}`}
               </p>
             </div>
-            <span className="shrink-0 text-xl font-bold">×{i.qty}</span>
+            <span className="shrink-0 text-xl font-bold">
+              ×{i.qty}
+              {i.unit && <span className="text-sm font-semibold"> {i.unit}</span>}
+            </span>
           </label>
         ))}
       </div>
-      <p className="text-right text-sm text-muted">รวม A5 {sheets} แผ่น</p>
+      <p className="text-right text-sm text-muted">
+        รวม A5 {sheets} แผ่น
+        {items.some((i) => i.unit) && ` · ราคาคงที่ ${items.filter((i) => i.unit).reduce((a, i) => a + i.qty, 0)} หน่วย`}
+      </p>
     </div>
   );
 }

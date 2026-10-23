@@ -13,6 +13,10 @@ export interface ProductRow {
   description: string;
   pieces_per_sheet: number | null;
   material: string;
+  pricing: "a5" | "fixed";
+  option_label: string;
+  unit_label: string;
+  shopee_item_id: string | null;
   design_code: string;
   designer_id: string | null;
   images: { path: string; thumb: string }[];
@@ -21,7 +25,7 @@ export interface ProductRow {
   active: boolean;
   position: number;
   created_at: string;
-  shop_product_sizes: { id: string; name: string; surcharge: number; position: number }[];
+  shop_product_sizes: { id: string; name: string; surcharge: number; price: number | null; units: number | null; position: number }[];
   shop_designs: {
     id: string;
     name: string;
@@ -34,7 +38,7 @@ export interface ProductRow {
 }
 
 const PRODUCT_SELECT =
-  "id, category_id, name, description, pieces_per_sheet, material, design_code, designer_id, images, badge_best, badge_new, active, position, created_at, shop_product_sizes(id, name, surcharge, position), shop_designs(id, name, sku, image_path, thumb_path, active, position)";
+  "id, category_id, name, description, pieces_per_sheet, material, pricing, option_label, unit_label, shopee_item_id, design_code, designer_id, images, badge_best, badge_new, active, position, created_at, shop_product_sizes(id, name, surcharge, price, units, position), shop_designs(id, name, sku, image_path, thumb_path, active, position)";
 
 const byPos = <T extends { position: number }>(a: T, b: T) => a.position - b.position;
 
@@ -80,13 +84,22 @@ async function toProduct(p: ProductRow & { sold: number }): Promise<ShopProduct>
     description: p.description,
     piecesPerSheet: p.pieces_per_sheet,
     material: p.material,
+    pricing: p.pricing ?? "a5",
+    optionLabel: p.option_label || "ขนาด",
+    unitLabel: p.unit_label || "แผ่น",
     images,
     badgeBest: p.badge_best,
     badgeNew: p.badge_new,
     sold: p.sold,
     createdAt: p.created_at,
     position: p.position,
-    sizes: [...p.shop_product_sizes].sort(byPos).map((s) => ({ id: s.id, name: s.name, surcharge: Number(s.surcharge) || 0 })),
+    sizes: [...p.shop_product_sizes].sort(byPos).map((s) => ({
+      id: s.id,
+      name: s.name,
+      surcharge: Number(s.surcharge) || 0,
+      price: s.price === null ? null : Number(s.price),
+      units: s.units,
+    })),
     designs,
   };
 }

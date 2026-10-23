@@ -18,7 +18,7 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
       <div className="flex flex-wrap items-end justify-between gap-2">
         <div>
           <h1 className="text-xl font-bold">รายงานยอดขาย สติกเกอร์สำเร็จรูป A5</h1>
-          <p className="text-sm text-muted">นับเฉพาะออเดอร์ที่ชำระแล้ว (ไม่รวมรอตรวจสลิปและยกเลิก) ตามวันที่สั่ง ยอดขายไม่รวมค่าส่ง</p>
+          <p className="text-sm text-muted">นับเฉพาะออเดอร์ที่ชำระแล้ว (ไม่รวมรอตรวจสลิปและยกเลิก) ตามวันที่สั่ง ยอดขายไม่รวมค่าส่ง · จำนวน = แผ่น (การ์ดนับเป็นแพ็ค)</p>
         </div>
         <form className="flex items-end gap-2" action="/admin/reports">
           <label className="block">
@@ -47,17 +47,17 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
 
       <Table
         title={`ต่อกราฟิก · ${monthLabel}`}
-        head={["กราฟิก", "แผ่น", "ยอดขาย", "สินค้าที่ขายได้"]}
+        head={["กราฟิก", "จำนวน", "ยอดขาย", "สินค้าที่ขายได้"]}
         rows={r.byDesigner.map((x) => [x.designer, n(x.sheets), baht(x.revenue), n(x.products)])}
       />
       <Table
         title="ต่อสินค้า"
-        head={["สินค้า", "กราฟิก", "แผ่น", "ยอดขาย", "ออเดอร์"]}
+        head={["สินค้า", "กราฟิก", "จำนวน", "ยอดขาย", "ออเดอร์"]}
         rows={r.byProduct.map((x) => [x.product, x.designer, n(x.sheets), baht(x.revenue), n(x.orders)])}
       />
       <Table
         title="ต่อลาย"
-        head={["SKU", "สินค้า / ลาย", "กราฟิก", "แผ่น", "ยอดขาย"]}
+        head={["SKU", "สินค้า / ลาย", "กราฟิก", "จำนวน", "ยอดขาย"]}
         rows={r.byDesign.map((x) => [x.sku, `${x.product} · ${x.design}${x.size ? ` · ${x.size}` : ""}`, x.designer, n(x.sheets), baht(x.revenue)])}
       />
     </div>

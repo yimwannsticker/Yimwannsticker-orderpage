@@ -188,6 +188,9 @@ export async function POST(req: Request) {
                 freeShippingMin: settings.a5FreeShippingMin,
                 shipping: a5q.shipping,
                 a3Shipping: quote.shipping,
+                ...(a5q.hasFixed
+                  ? { fixedShipping: a5q.fixedShipping, fixedUnits: a5q.fixedUnits, fixedShippingFee: settings.fixedShippingFee, fixedFreeShippingUnits: settings.fixedFreeShippingUnits }
+                  : {}),
               },
             }
           : {}),
@@ -256,6 +259,7 @@ export async function POST(req: Request) {
               designer_name: l.designerName,
               thumb_path: l.thumbPath,
               qty: l.qty,
+              ...(l.fixed ? { pricing: "fixed", units: l.fixed.units, unit_label: l.unitLabel } : {}),
               unit_price: a5q.lines[idx].unitPrice,
               line_total: a5q.lines[idx].lineTotal,
             })),
@@ -286,8 +290,8 @@ export async function POST(req: Request) {
     .map((it, i) => `${i + 1}. ${it.up.file_name} — ${productLabel(it.product, it.finish)} ${shapeLabel(it.shape)} ${sizeText(it)} × ${it.qty}${it.freeQty ? ` (+แถม ${it.freeQty})` : ""}${it.trim ? " [ตัดพื้นหลังรอบงาน]" : ""}${it.check ? ` [${it.check.title}]` : ""}`)
     .join("\n");
   const a5Text = a5.lines.length
-    ? `สติกเกอร์สำเร็จรูป A5 (${a5q.sheets} แผ่น)\n${a5.lines
-        .map((l) => `- ${l.sku} ${l.productName} / ${l.designName}${l.sizeName ? ` / ${l.sizeName}` : ""} × ${l.qty}`)
+    ? `สินค้าสำเร็จรูป (A5 ${a5q.sheets} แผ่น${a5q.hasFixed ? ` · การ์ด ${a5q.fixedUnits} ใบ` : ""})\n${a5.lines
+        .map((l) => `- ${l.sku} ${l.productName} / ${l.designName}${l.sizeName ? ` / ${l.sizeName}` : ""} × ${l.qty}${l.fixed ? ` ${l.unitLabel}` : ""}`)
         .join("\n")}\n\n`
     : "";
   const a3Text = items.length ? `งานพิมพ์ไฟล์ ${settings.sheetName}\n${lines}\nรวม ${quote.totalSheets} แผ่น แถม ${quote.freeSheets} แผ่น\n\n` : "";

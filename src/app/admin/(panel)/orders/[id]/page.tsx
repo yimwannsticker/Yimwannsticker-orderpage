@@ -71,7 +71,7 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
         <div className="space-y-4 lg:col-span-2">
           {a5Items.length > 0 && (
             <div className="card space-y-3">
-              <h2 className="font-bold">สติกเกอร์สำเร็จรูป A5 ({order.a5_sheets ?? 0} แผ่น)</h2>
+              <h2 className="font-bold">สินค้าสำเร็จรูป (A5 {order.a5_sheets ?? 0} แผ่น)</h2>
               <PickList
                 orderId={order.id}
                 items={a5Items.map((i) => ({
@@ -81,6 +81,7 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
                   designName: i.design_name,
                   sizeName: i.size_name,
                   qty: i.qty,
+                  unit: i.pricing === "fixed" ? (i.unit_label ?? "ชิ้น") : null,
                   thumbUrl: a5Thumbs[i.id] ?? null,
                   picked: Boolean(i.picked_at),
                 }))}

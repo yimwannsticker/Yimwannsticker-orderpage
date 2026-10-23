@@ -263,6 +263,9 @@ export async function updateSettings(data: Settings): Promise<Result> {
   if (new Set(s.a5Tiers.map((t) => t.min)).size !== s.a5Tiers.length) return { ok: false, error: "จำนวนแผ่นในตารางราคา A5 ซ้ำกัน" };
   s.a5Tiers = [...s.a5Tiers].sort((a, b) => a.min - b.min);
   if (!(s.a5ShippingFee >= 0) || !(s.a5FreeShippingMin >= 0)) return { ok: false, error: "ค่าส่ง A5 ไม่ถูกต้อง" };
+  s.fixedShippingFee = Number(s.fixedShippingFee ?? 30);
+  s.fixedFreeShippingUnits = Number(s.fixedFreeShippingUnits ?? 200);
+  if (!(s.fixedShippingFee >= 0) || !(s.fixedFreeShippingUnits >= 0)) return { ok: false, error: "ค่าส่งการ์ดไม่ถูกต้อง" };
   s.banners = (s.banners ?? [])
     .filter((b) => /^catalog\/[0-9a-f-]{36}\.(webp|jpg|png)$/.test(b.path))
     .slice(0, 10)

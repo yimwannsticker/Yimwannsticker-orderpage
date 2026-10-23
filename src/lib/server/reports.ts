@@ -34,6 +34,7 @@ type Row = {
   designer_name: string | null;
   qty: number;
   line_total: number;
+  pricing: string | null;
 };
 
 /** ยอดขายสติกเกอร์สำเร็จรูป A5 รายเดือน: ต่อสินค้า ต่อลาย ต่อกราฟิก (ใช้คิดค่าคอมมิชชั่น) */
@@ -43,7 +44,7 @@ export async function getA5Report(month: string): Promise<A5Report> {
   for (let from = 0; ; from += 1000) {
     const { data, error } = await db()
       .from("order_a5_items")
-      .select("order_id, product_name, design_name, size_name, sku, designer_name, qty, line_total, orders!inner(status, created_at)")
+      .select("order_id, product_name, design_name, size_name, sku, designer_name, qty, line_total, pricing, orders!inner(status, created_at)")
       .in("orders.status", REPORT_STATUSES)
       .gte("orders.created_at", start)
       .lt("orders.created_at", end)
@@ -75,7 +76,8 @@ export async function getA5Report(month: string): Promise<A5Report> {
   return {
     month,
     orders: new Set(rows.map((r) => r.order_id)).size,
-    sheets: rows.reduce((a, r) => a + r.qty, 0),
+    // แผ่น A5 จริง (ไม่รวมการ์ดที่ขายเป็นแพ็ค)
+    sheets: rows.reduce((a, r) => a + (r.pricing === "fixed" ? 0 : r.qty), 0),
     revenue: rows.reduce((a, r) => a + Number(r.line_total), 0),
     byProduct: [...prod.values()].map(({ orderSet, ...x }) => ({ ...x, orders: orderSet.size })).sort(bySheets),
     byDesign: [...design.values()].sort((a, b) => a.sku.localeCompare(b.sku, "th", { numeric: true })),

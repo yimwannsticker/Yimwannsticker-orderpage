@@ -358,8 +358,12 @@ function A5Section({
           <Num label="ค่าส่ง A5" value={s.a5ShippingFee} onChange={(v) => set("a5ShippingFee", v)} suffix="บาท" />
           <Num label="A5 ส่งฟรีเมื่อรวมตั้งแต่" value={s.a5FreeShippingMin} onChange={(v) => set("a5FreeShippingMin", v)} suffix="แผ่น" />
         </div>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Num label="ค่าส่งสินค้าราคาคงที่ (การ์ด)" value={s.fixedShippingFee} onChange={(v) => set("fixedShippingFee", v)} suffix="บาท" />
+          <Num label="การ์ดส่งฟรีเมื่อรวมตั้งแต่" value={s.fixedFreeShippingUnits} onChange={(v) => set("fixedFreeShippingUnits", v)} suffix="ใบ" />
+        </div>
         <p className="text-xs text-muted">
-          ออเดอร์ที่มีทั้ง A5 และ A3+: คิดค่าส่งตามเกณฑ์ของแต่ละฝั่ง แล้วเก็บอันที่แพงกว่า (ส่งกล่องเดียว) · โปรสะสมนับเฉพาะ A3+
+          ออเดอร์ที่มีทั้ง A5 และ A3+: คิดค่าส่งตามเกณฑ์ของแต่ละฝั่ง แล้วเก็บอันที่แพงกว่า (ส่งกล่องเดียว) · การ์ดสั่งรวมกับรายการอื่นที่ถึงยอดส่งฟรีแล้ว ส่งฟรีทั้งกล่อง · โปรสะสมนับเฉพาะ A3+
         </p>
       </Section>
 

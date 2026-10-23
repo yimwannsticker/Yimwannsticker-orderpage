@@ -63,6 +63,8 @@ export const DEFAULT_SETTINGS: Settings = {
   ],
   a5ShippingFee: 30,
   a5FreeShippingMin: 15,
+  fixedShippingFee: 30,
+  fixedFreeShippingUnits: 200,
   banners: [],
 };
 

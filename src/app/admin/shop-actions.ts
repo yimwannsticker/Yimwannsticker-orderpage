@@ -101,7 +101,12 @@ export interface ProductInput {
   badgeBest: boolean;
   badgeNew: boolean;
   active: boolean;
-  sizes: { id?: string; name: string; surcharge: number }[];
+  pricing: "a5" | "fixed";
+  optionLabel: string;
+  unitLabel: string;
+  /** รหัสสินค้า Shopee (ตอนนำเข้า) */
+  shopeeItemId?: string | null;
+  sizes: { id?: string; name: string; surcharge: number; price?: number | null; units?: number | null }[];
   designs: { id?: string; name: string; sku: string; imagePath: string | null; thumbPath: string | null; active: boolean }[];
 }
 
@@ -131,13 +136,20 @@ export async function saveProduct(input: ProductInput): Promise<Result> {
   const clash = designs.find((d) => taken.has(d.sku.toLowerCase()));
   if (clash) return { ok: false, error: `รหัส SKU ${clash.sku} ซ้ำกับสินค้าอื่น` };
 
+  const pricing = input.pricing === "fixed" ? "fixed" : "a5";
+  const money = (n: unknown) => Math.round((Number(n) || 0) * 100) / 100;
   const sizes = (input.sizes ?? []).slice(0, 20).map((s) => ({
     id: isUuid(s.id) ? s.id : crypto.randomUUID(),
     name: clean(s.name, 60),
-    surcharge: Math.round((Number(s.surcharge) || 0) * 100) / 100,
+    surcharge: pricing === "fixed" ? 0 : money(s.surcharge),
+    price: pricing === "fixed" ? money(s.price) : null,
+    units: pricing === "fixed" ? Math.max(1, Math.floor(Number(s.units) || 1)) : null,
   }));
-  if (sizes.some((s) => !s.name)) return { ok: false, error: "มีขนาดที่ยังไม่ได้ใส่ชื่อ" };
+  const optionLabel = clean(input.optionLabel, 20) || "ขนาด";
+  if (sizes.some((s) => !s.name)) return { ok: false, error: `มี${optionLabel}ที่ยังไม่ได้ใส่ชื่อ` };
   if (sizes.some((s) => s.surcharge < 0)) return { ok: false, error: "ส่วนต่างราคาต้องไม่ติดลบ" };
+  if (pricing === "fixed" && !sizes.length) return { ok: false, error: `สินค้าราคาคงที่ต้องมี${optionLabel}อย่างน้อย 1 อย่าง พร้อมราคา` };
+  if (pricing === "fixed" && sizes.some((s) => !(s.price! > 0))) return { ok: false, error: `กรุณาใส่ราคาของทุก${optionLabel}` };
 
   const pieces = Math.floor(Number(input.piecesPerSheet) || 0);
   const row = {
@@ -147,6 +159,10 @@ export async function saveProduct(input: ProductInput): Promise<Result> {
     description: clean(input.description, 5000),
     pieces_per_sheet: pieces > 0 ? pieces : null,
     material: clean(input.material, 100),
+    pricing,
+    option_label: optionLabel,
+    unit_label: pricing === "fixed" ? clean(input.unitLabel, 20) || "ชิ้น" : "แผ่น",
+    ...(input.shopeeItemId ? { shopee_item_id: clean(input.shopeeItemId, 40) } : {}),
     design_code: clean(input.designCode, 30),
     designer_id: isUuid(input.designerId) ? input.designerId : null,
     images: (input.images ?? []).filter((i) => isPath(i.path)).slice(0, 20).map((i) => ({ path: i.path, thumb: isPath(i.thumb) ? i.thumb : i.path })),

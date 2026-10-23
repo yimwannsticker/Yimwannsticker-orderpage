@@ -27,6 +27,9 @@ export default async function ProductEditPage({ params }: { params: Promise<{ id
     badgeBest: false,
     badgeNew: true,
     active: true,
+    pricing: "a5",
+    optionLabel: "ขนาด",
+    unitLabel: "แผ่น",
     sizes: [],
     designs: [],
   };
@@ -34,7 +37,7 @@ export default async function ProductEditPage({ params }: { params: Promise<{ id
     const { data } = await db()
       .from("shop_products")
       .select(
-        "*, shop_product_sizes(id, name, surcharge, position), shop_designs(id, name, sku, image_path, thumb_path, active, position)",
+        "*, shop_product_sizes(id, name, surcharge, price, units, position), shop_designs(id, name, sku, image_path, thumb_path, active, position)",
       )
       .eq("id", id)
       .maybeSingle();
@@ -55,7 +58,12 @@ export default async function ProductEditPage({ params }: { params: Promise<{ id
       badgeBest: p.badge_best,
       badgeNew: p.badge_new,
       active: p.active,
-      sizes: [...p.shop_product_sizes].sort((a, b) => a.position - b.position).map((s) => ({ id: s.id, name: s.name, surcharge: Number(s.surcharge) })),
+      pricing: p.pricing ?? "a5",
+      optionLabel: p.option_label || "ขนาด",
+      unitLabel: p.unit_label || "แผ่น",
+      sizes: [...p.shop_product_sizes]
+        .sort((a, b) => a.position - b.position)
+        .map((s) => ({ id: s.id, name: s.name, surcharge: Number(s.surcharge), price: s.price === null ? null : Number(s.price), units: s.units })),
       designs: await Promise.all(
         [...p.shop_designs]
           .sort((a, b) => a.position - b.position)

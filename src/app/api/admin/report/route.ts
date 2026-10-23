@@ -14,15 +14,15 @@ export async function GET(req: Request) {
   const r = await getA5Report(month);
 
   const products: SheetData = [
-    head(["สินค้า", "กราฟิก", "จำนวนแผ่น", "ยอดขาย (บาท)", "จำนวนออเดอร์"]),
+    head(["สินค้า", "กราฟิก", "จำนวน (แผ่น/แพ็ค)", "ยอดขาย (บาท)", "จำนวนออเดอร์"]),
     ...r.byProduct.map((x) => [x.product, x.designer, x.sheets, x.revenue, x.orders]),
   ];
   const designs: SheetData = [
-    head(["SKU", "สินค้า", "ลาย", "ขนาด", "กราฟิก", "จำนวนแผ่น", "ยอดขาย (บาท)"]),
+    head(["SKU", "สินค้า", "ลาย", "ขนาด", "กราฟิก", "จำนวน (แผ่น/แพ็ค)", "ยอดขาย (บาท)"]),
     ...r.byDesign.map((x) => [x.sku, x.product, x.design, x.size, x.designer, x.sheets, x.revenue]),
   ];
   const designers: SheetData = [
-    head(["กราฟิก", "จำนวนแผ่น", "ยอดขาย (บาท)", "จำนวนสินค้าที่ขายได้"]),
+    head(["กราฟิก", "จำนวน (แผ่น/แพ็ค)", "ยอดขาย (บาท)", "จำนวนสินค้าที่ขายได้"]),
     ...r.byDesigner.map((x) => [x.designer, x.sheets, x.revenue, x.products]),
   ];
   const buf = await writeXlsxFile([

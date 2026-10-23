@@ -6,7 +6,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { a5NudgeText, combineTotals, computeA5Quote } from "@/lib/a5-pricing";
 import { resolveCart } from "@/lib/cart-resolve";
 import { clearCart, getCart, useCart } from "@/lib/client/cart";
-import type { ShopCatalog } from "@/lib/shop-types";
+import { quoteLineFor, type ShopCatalog } from "@/lib/shop-types";
 import { productLabel, shapeLabel } from "@/lib/constants";
 import { itemCheck, perSheet, sizeText } from "@/lib/sticker-size";
 import { baht, isValidPhone, normalizePhone } from "@/lib/format";
@@ -107,7 +107,7 @@ export function OrderWizard({ settings, catalog }: { settings: PublicSettings; c
   const a5Resolved = useMemo(() => resolveCart(cartLines, catalog), [cartLines, catalog]);
   const a5Ok = a5Resolved.filter((r) => !r.problem);
   const a5Bad = a5Resolved.length - a5Ok.length;
-  const a5q = useMemo(() => computeA5Quote(settings, a5Ok.map((r) => ({ qty: r.line.qty, surcharge: r.size?.surcharge ?? 0 }))), [settings, a5Ok]);
+  const a5q = useMemo(() => computeA5Quote(settings, a5Ok.map((r) => quoteLineFor(r.product!, r.size, r.line.qty))), [settings, a5Ok]);
   const [items, setItems] = useState<DraftItem[]>(init.items);
   const [customer, setCustomer] = useState<CustomerForm>(init.customer);
   const [step, setStep] = useState(init.step);
@@ -481,7 +481,7 @@ export function OrderWizard({ settings, catalog }: { settings: PublicSettings; c
       {a5Ok.length > 0 && step < STEP_ADDRESS && (
         <div className="mb-4">
           <Alert tone="info">
-            ในตะกร้ามีสติกเกอร์สำเร็จรูป A5 {a5q.sheets} แผ่น จะรวมส่งในออเดอร์นี้ ·{" "}
+            ในตะกร้ามีสินค้าสำเร็จรูป {a5Ok.length} รายการ จะรวมส่งในออเดอร์นี้ ·{" "}
             <Link href="/cart" className="font-semibold underline">
               ดูตะกร้า
             </Link>
@@ -562,7 +562,8 @@ export function OrderWizard({ settings, catalog }: { settings: PublicSettings; c
             {a5Ok.length > 0 && (
               <div className="space-y-2 border-b border-line pb-3">
                 <p className="text-sm font-bold">
-                  สติกเกอร์สำเร็จรูป A5 · {a5q.sheets} แผ่น × {baht(a5q.tier.price)}
+                  {a5q.hasFixed ? "สินค้าสำเร็จรูป" : "สติกเกอร์สำเร็จรูป A5"}
+                  {a5q.sheets > 0 && ` · A5 ${a5q.sheets} แผ่น × ${baht(a5q.tier.price)}`}
                   <Link href="/cart" className="ml-2 text-xs font-normal text-brand-600 underline">
                     แก้ไข
                   </Link>
@@ -582,7 +583,10 @@ export function OrderWizard({ settings, catalog }: { settings: PublicSettings; c
                         {r.size && ` · ${r.size.name}`}
                       </p>
                     </div>
-                    <span className="shrink-0 text-muted">×{r.line.qty}</span>
+                    <span className="shrink-0 text-muted">
+                      ×{r.line.qty}
+                      {r.product!.pricing === "fixed" && ` ${r.product!.unitLabel}`}
+                    </span>
                     <span className="w-16 shrink-0 text-right font-semibold">{baht(a5q.lines[idx]?.lineTotal ?? 0)}</span>
                   </div>
                 ))}
@@ -613,7 +617,8 @@ export function OrderWizard({ settings, catalog }: { settings: PublicSettings; c
               </div>
             ))}
             <div className="space-y-1 border-t border-line pt-3 text-sm">
-              {a5q.sheets > 0 && <Row label={`สติกเกอร์ A5 ${a5q.sheets} แผ่น`} value={baht(a5q.subtotal)} />}
+              {a5q.sheets > 0 && <Row label={`สติกเกอร์ A5 ${a5q.sheets} แผ่น`} value={baht(a5q.subtotal - a5q.fixedSubtotal)} />}
+              {a5q.hasFixed && <Row label={`การ์ด ${a5q.fixedUnits.toLocaleString("th-TH")} ใบ`} value={baht(a5q.fixedSubtotal)} />}
               {quote.totalSheets > 0 && <Row label={`งานพิมพ์ ${settings.sheetName} ${quote.totalSheets} แผ่น`} value={baht(quote.subtotal)} />}
               {quote.fixFeeTotal > 0 && <Row label="ค่าบริการแก้ไฟล์" value={baht(quote.fixFeeTotal)} />}
               <Row label="ค่าส่ง" value={totals.shipping ? baht(totals.shipping) : "ส่งฟรี"} />
@@ -666,11 +671,15 @@ export function OrderWizard({ settings, catalog }: { settings: PublicSettings; c
               {visibleError}
             </p>
           )}
-          {step >= 1 && (quote.totalSheets > 0 || a5q.sheets > 0) && (
+          {step >= 1 && (quote.totalSheets > 0 || a5q.sheets > 0 || a5q.hasFixed) && (
             <div className="mb-2">
               <div className="flex items-baseline justify-between">
                 <span className="text-sm text-muted">
-                  {[quote.totalSheets ? `${settings.sheetName} ${quote.totalSheets} แผ่น` : null, a5q.sheets ? `A5 ${a5q.sheets} แผ่น` : null]
+                  {[
+                    quote.totalSheets ? `${settings.sheetName} ${quote.totalSheets} แผ่น` : null,
+                    a5q.sheets ? `A5 ${a5q.sheets} แผ่น` : null,
+                    a5q.hasFixed ? `การ์ด ${a5q.fixedUnits} ใบ` : null,
+                  ]
                     .filter(Boolean)
                     .join(" + ")}{" "}
                   {totals.shipping ? `· ค่าส่ง ${totals.shipping}` : "· ส่งฟรี"}
@@ -679,6 +688,9 @@ export function OrderWizard({ settings, catalog }: { settings: PublicSettings; c
               </div>
               {quote.nudge && <p className="text-sm font-medium text-brand-600">✨ {nudgeText(quote.nudge)}</p>}
               {a5q.nudge && step >= STEP_ADDRESS && <p className="text-sm font-medium text-brand-600">✨ {a5NudgeText(a5q.nudge)}</p>}
+              {a5q.fixedNudge && totals.shipping > 0 && step >= STEP_ADDRESS && (
+                <p className="text-sm font-medium text-brand-600">✨ {a5NudgeText(a5q.fixedNudge)}</p>
+              )}
             </div>
           )}
           <div className="flex gap-2">

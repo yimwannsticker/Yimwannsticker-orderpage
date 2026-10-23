@@ -8,7 +8,7 @@ import { sameLine, setCart, updateDraftItems, useCart, useDraftItems } from "@/l
 import { productLabel, shapeLabel } from "@/lib/constants";
 import { baht } from "@/lib/format";
 import { computeQuote, itemProblem, nudgeText } from "@/lib/pricing";
-import type { ShopCatalog } from "@/lib/shop-types";
+import { quoteLineFor, type ShopCatalog } from "@/lib/shop-types";
 import { itemCheck, sizeText } from "@/lib/sticker-size";
 import type { PublicSettings } from "@/lib/types";
 import { FileIcon } from "../ui";
@@ -20,10 +20,11 @@ export function CartView({ settings, catalog }: { settings: PublicSettings; cata
   const resolved = useMemo(() => resolveCart(lines, catalog), [lines, catalog]);
   const ok = resolved.filter((r) => !r.problem);
   const bad = resolved.filter((r) => r.problem);
-  const a5 = useMemo(() => computeA5Quote(settings, ok.map((r) => ({ qty: r.line.qty, surcharge: r.size?.surcharge ?? 0 }))), [settings, ok]);
+  const a5 = useMemo(() => computeA5Quote(settings, ok.map((r) => quoteLineFor(r.product!, r.size, r.line.qty))), [settings, ok]);
   const a3q = useMemo(() => computeQuote(settings, a3), [settings, a3]);
   const totals = combineTotals(a3q, a5);
-  const unitOf = (r: ResolvedLine) => a5.tier.price + (r.size?.surcharge ?? 0);
+  const unitOf = (r: ResolvedLine) => a5.lines[ok.indexOf(r)]?.unitPrice ?? 0;
+  const unitLabel = (r: ResolvedLine) => (r.product?.pricing === "fixed" ? r.product.unitLabel : "แผ่น");
 
   // จัดกลุ่ม A5 ตามสินค้า (ลำดับตามที่ใส่ตะกร้า)
   const groups = useMemo(() => {
@@ -77,9 +78,9 @@ export function CartView({ settings, catalog }: { settings: PublicSettings; cata
       {groups.length > 0 && (
         <section className="space-y-2">
           <div className="flex items-baseline justify-between">
-            <h2 className="font-bold">สติกเกอร์สำเร็จรูป A5</h2>
+            <h2 className="font-bold">{a5.hasFixed ? "สินค้าสำเร็จรูป" : "สติกเกอร์สำเร็จรูป A5"}</h2>
             <span className="text-sm text-muted">
-              {a5.sheets} แผ่น · แผ่นละ {baht(a5.tier.price)}
+              {a5.sheets > 0 && `${a5.sheets} แผ่น · แผ่นละ ${baht(a5.tier.price)}`}
             </span>
           </div>
           {groups.map((g) => {
@@ -102,7 +103,7 @@ export function CartView({ settings, catalog }: { settings: PublicSettings; cata
                       <p className="truncate font-medium">{r.design!.name}</p>
                       <p className="text-xs text-muted">
                         {r.design!.sku}
-                        {r.size && ` · ${r.size.name}`} · {baht(unitOf(r))}/แผ่น
+                        {r.size && ` · ${r.size.name}`} · {baht(unitOf(r))}/{unitLabel(r)}
                       </p>
                     </div>
                     <div className="flex flex-col items-end gap-1">
@@ -117,6 +118,7 @@ export function CartView({ settings, catalog }: { settings: PublicSettings; cata
             );
           })}
           {a5.nudge && <p className="px-1 text-sm font-medium text-brand-600">✨ {a5NudgeText(a5.nudge)}</p>}
+          {a5.fixedNudge && totals.shipping > 0 && <p className="px-1 text-sm font-medium text-brand-600">✨ {a5NudgeText(a5.fixedNudge)}</p>}
         </section>
       )}
 
@@ -165,7 +167,8 @@ export function CartView({ settings, catalog }: { settings: PublicSettings; cata
 
       <div className="sticky bottom-[calc(4.25rem+env(safe-area-inset-bottom))] z-10 rounded-2xl bg-white p-4 shadow-lg ring-1 ring-line">
         <div className="space-y-0.5 text-sm">
-          {a5.sheets > 0 && <Row label={`A5 ${a5.sheets} แผ่น`} value={baht(a5.subtotal)} />}
+          {a5.sheets > 0 && <Row label={`A5 ${a5.sheets} แผ่น`} value={baht(a5.subtotal - a5.fixedSubtotal)} />}
+          {a5.hasFixed && <Row label={`การ์ด ${a5.fixedUnits.toLocaleString("th-TH")} ใบ`} value={baht(a5.fixedSubtotal)} />}
           {a3q.totalSheets > 0 && <Row label={`${settings.sheetName} ${a3q.totalSheets} แผ่น`} value={baht(a3q.subtotal + a3q.fixFeeTotal)} />}
           <Row label="ค่าส่ง" value={totals.shipping ? baht(totals.shipping) : "ส่งฟรี"} />
         </div>

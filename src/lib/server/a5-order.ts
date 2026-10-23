@@ -7,6 +7,9 @@ export interface A5OrderLine {
   sizeId: string | null;
   qty: number;
   surcharge: number;
+  /** สินค้าราคาคงที่: ราคาต่อหน่วยและจำนวนชิ้นต่อหน่วย */
+  fixed: { price: number; units: number } | null;
+  unitLabel: string;
   productName: string;
   designName: string;
   sizeName: string | null;
@@ -40,7 +43,7 @@ export async function loadA5Lines(raw: unknown): Promise<{ ok: true; lines: A5Or
   const { data, error } = await db()
     .from("shop_designs")
     .select(
-      "id, name, sku, thumb_path, image_path, active, shop_products(id, name, active, designer_id, designers(name), shop_product_sizes(id, name, surcharge))",
+      "id, name, sku, thumb_path, image_path, active, shop_products(id, name, active, pricing, unit_label, designer_id, designers(name), shop_product_sizes(id, name, surcharge, price, units))",
     )
     .in("id", [...new Set(want.map((w) => w.designId))]);
   if (error) return { ok: false, error: "ตรวจรายการสติกเกอร์ A5 ไม่สำเร็จ กรุณาลองใหม่" };
@@ -56,9 +59,11 @@ export async function loadA5Lines(raw: unknown): Promise<{ ok: true; lines: A5Or
       id: string;
       name: string;
       active: boolean;
+      pricing: "a5" | "fixed" | null;
+      unit_label: string | null;
       designer_id: string | null;
       designers: { name: string } | null;
-      shop_product_sizes: { id: string; name: string; surcharge: number }[];
+      shop_product_sizes: { id: string; name: string; surcharge: number; price: number | null; units: number | null }[];
     } | null;
   };
   const rows = (data ?? []) as unknown as Row[];
@@ -70,13 +75,17 @@ export async function loadA5Lines(raw: unknown): Promise<{ ok: true; lines: A5Or
     if (!d.active) return { ok: false, error: `ลาย ${d.sku} หมดชั่วคราว กรุณาลบออกในตะกร้า` };
     const sizes = p.shop_product_sizes ?? [];
     const size = sizes.find((s) => s.id === w.sizeId) ?? null;
-    if (sizes.length && !size) return { ok: false, error: `ขนาดของลาย ${d.sku} ไม่มีแล้ว กรุณาเลือกใหม่` };
+    if (sizes.length && !size) return { ok: false, error: `ตัวเลือกของลาย ${d.sku} ไม่มีแล้ว กรุณาเลือกใหม่` };
+    const fixed = p.pricing === "fixed";
+    if (fixed && !(Number(size?.price) > 0)) return { ok: false, error: `ลาย ${d.sku} ยังไม่ได้ตั้งราคา กรุณาติดต่อร้าน` };
     lines.push({
       productId: p.id,
       designId: d.id,
       sizeId: size?.id ?? null,
       qty: w.qty,
-      surcharge: Number(size?.surcharge) || 0,
+      surcharge: fixed ? 0 : Number(size?.surcharge) || 0,
+      fixed: fixed ? { price: Number(size!.price), units: Math.max(1, Number(size!.units) || 1) } : null,
+      unitLabel: fixed ? p.unit_label || "ชิ้น" : "แผ่น",
       productName: p.name,
       designName: d.name,
       sizeName: size?.name ?? null,

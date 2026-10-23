@@ -14,7 +14,7 @@ export default async function CategoryPage({ searchParams }: { searchParams: Pro
   const cat = catalog.categories.find((c) => c.id === sp.c) ?? null;
 
   let list = cat ? catalog.products.filter((p) => p.categoryId === cat.id) : catalog.products;
-  list = sortProducts(searchProducts(list, q), sort);
+  list = sortProducts(searchProducts(list, q), sort, settings.a5Tiers[0]?.price ?? 0);
 
   const href = (p: { c?: string | null; sort?: string }) => {
     const u = new URLSearchParams();

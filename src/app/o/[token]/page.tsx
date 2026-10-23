@@ -26,7 +26,7 @@ export default async function OrderStatusPage({ params }: { params: Promise<{ to
   const a5Thumbs = Object.fromEntries(await Promise.all(a5Items.map(async (i) => [i.id, await imageUrl(i.thumb_path)] as const)));
   const a5Again = a5Items
     .filter((i) => i.product_id && i.design_id)
-    .map((i) => ({ productId: i.product_id!, designId: i.design_id!, sizeId: i.size_id, qty: i.qty }));
+    .map((i) => ({ productId: i.product_id!, designId: i.design_id!, sizeId: i.size_id, qty: i.qty, ...(i.pricing === "fixed" ? { fixed: true } : {}) }));
   const previews = await signedUrls(items.map((i) => i.preview_path));
   const pub = toPublic(settings);
   const idx = STATUS_FLOW.indexOf(order.status);
@@ -148,7 +148,7 @@ export default async function OrderStatusPage({ params }: { params: Promise<{ to
         {a5Items.length > 0 && (
           <div className="space-y-2 border-b border-line pb-3">
             <p className="text-sm font-semibold">
-              สติกเกอร์สำเร็จรูป A5 · {order.a5_sheets} แผ่น · {baht(Number(order.a5_subtotal))}
+              สินค้าสำเร็จรูป{order.a5_sheets ? ` · A5 ${order.a5_sheets} แผ่น` : ""} · {baht(Number(order.a5_subtotal))}
             </p>
             {a5Items.map((i) => (
               <div key={i.id} className="flex items-center gap-2.5 text-sm">
@@ -166,7 +166,8 @@ export default async function OrderStatusPage({ params }: { params: Promise<{ to
                   </p>
                 </div>
                 <span className="shrink-0 text-muted">
-                  {i.qty} × {baht(Number(i.unit_price))}
+                  {i.qty}
+                  {i.pricing === "fixed" ? ` ${i.unit_label ?? ""}` : ""} × {baht(Number(i.unit_price))}
                 </span>
               </div>
             ))}

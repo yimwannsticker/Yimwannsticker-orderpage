@@ -60,6 +60,7 @@ create table if not exists public.shop_designs (
 create index if not exists shop_designs_product_idx on public.shop_designs (product_id, position);
 create unique index if not exists shop_designs_sku_idx on public.shop_designs (lower(sku));
 
+drop trigger if exists shop_products_touch on public.shop_products;
 create trigger shop_products_touch before update on public.shop_products
   for each row execute function public.touch_updated_at();
 
@@ -108,3 +109,25 @@ alter table public.shop_product_sizes enable row level security;
 alter table public.shop_designs enable row level security;
 alter table public.order_a5_items enable row level security;
 revoke all on public.shop_product_sold from anon, authenticated;
+
+-- สินค้าราคาคงที่ (เช่น การ์ดแพ็ค 25/50/100 ใบ) และชื่อตัวเลือก/หน่วยที่ตั้งเองได้
+alter table public.shop_products
+  add column if not exists pricing text not null default 'a5' check (pricing in ('a5', 'fixed')),
+  -- ชื่อปุ่มตัวเลือก เช่น ขนาด / สี / แพ็ค
+  add column if not exists option_label text not null default 'ขนาด',
+  -- หน่วยที่ขาย เช่น แผ่น / แพ็ค
+  add column if not exists unit_label text not null default 'แผ่น',
+  -- รหัสสินค้าใน Shopee (กันนำเข้าซ้ำ)
+  add column if not exists shopee_item_id text;
+create unique index if not exists shop_products_shopee_idx on public.shop_products (shopee_item_id) where shopee_item_id is not null;
+
+alter table public.shop_product_sizes
+  -- ราคาต่อหน่วยของสินค้าราคาคงที่
+  add column if not exists price numeric(10, 2),
+  -- จำนวนชิ้นต่อหน่วย (เช่น แพ็ค 25 ใบ = 25) ใช้นับเกณฑ์ส่งฟรีของสินค้าราคาคงที่
+  add column if not exists units int;
+
+alter table public.order_a5_items
+  add column if not exists pricing text not null default 'a5',
+  add column if not exists units int,
+  add column if not exists unit_label text;

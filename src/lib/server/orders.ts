@@ -106,6 +106,10 @@ export interface A5ItemRow {
   unit_price: number;
   line_total: number;
   picked_at: string | null;
+  /** fixed = สินค้าราคาคงที่ (การ์ด) ไม่นับเป็นแผ่น A5 */
+  pricing?: "a5" | "fixed";
+  units?: number | null;
+  unit_label?: string | null;
 }
 
 /** รายการ A5 ของออเดอร์ เรียงตาม SKU (หยิบของง่าย) */

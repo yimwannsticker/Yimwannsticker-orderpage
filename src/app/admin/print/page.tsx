@@ -53,7 +53,12 @@ export default async function PrintSlipsPage({ searchParams }: { searchParams: P
           note: o.customer_note,
           groups: [...groups.entries()].map(([product, rows]) => ({
             product,
-            rows: rows.map((r) => ({ sku: r.sku, label: [r.design_name, r.size_name].filter(Boolean).join(" · "), qty: r.qty })),
+            rows: rows.map((r) => ({
+              sku: r.sku,
+              label: [r.design_name, r.size_name].filter(Boolean).join(" · "),
+              qty: r.qty,
+              unit: r.pricing === "fixed" ? (r.unit_label ?? "ชิ้น") : null,
+            })),
           })),
           a3: a3.map((i) => ({
             label: `${settings.sheetName} ไฟล์ ${i.position}: ${i.file_name}`,
@@ -63,7 +68,8 @@ export default async function PrintSlipsPage({ searchParams }: { searchParams: P
             qty: i.qty,
             free: i.free_qty,
           })),
-          a5Sheets: a5Rows.reduce((s, r) => s + r.qty, 0),
+          a5Sheets: a5Rows.reduce((s, r) => s + (r.pricing === "fixed" ? 0 : r.qty), 0),
+          fixedUnits: a5Rows.reduce((s, r) => s + (r.pricing === "fixed" ? r.qty * (r.units ?? 1) : 0), 0),
           a3Sheets: o.total_sheets,
           freeSheets: o.free_sheets,
         };

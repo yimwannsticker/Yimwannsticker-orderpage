@@ -74,3 +74,43 @@ describe("แพ็กของ", () => {
     expect(nextSkuNumber("33", [])).toBe(1);
   });
 });
+
+describe("สินค้าราคาคงที่ (การ์ด)", () => {
+  const card = (qty: number, units: number, price: number) => ({ qty, surcharge: 0, fixed: { price, units } });
+  const noA3 = { subtotal: 0, fixFeeTotal: 0, shipping: 0, totalSheets: 0 };
+
+  it("ไม่นับเป็นแผ่น A5 และใช้ราคาตามแพ็ค", () => {
+    const q = computeA5Quote(s, [card(2, 50, 130), { qty: 14, surcharge: 0 }]);
+    expect(q.sheets).toBe(14);
+    expect(q.tier.price).toBe(15);
+    expect(q.fixedUnits).toBe(100);
+    expect(q.fixedSubtotal).toBe(260);
+    expect(q.subtotal).toBe(260 + 210);
+  });
+  it("สั่งการ์ดอย่างเดียว ไม่ถึง 200 ใบ ค่าส่ง 30", () => {
+    const q = computeA5Quote(s, [card(1, 100, 220)]);
+    expect(q.fixedShipping).toBe(30);
+    expect(a5NudgeText(q.fixedNudge!)).toBe("สั่งการ์ดเพิ่มอีก 100 ใบ ส่งฟรี");
+    expect(combineTotals(noA3, q)).toEqual({ shipping: 30, total: 250 });
+  });
+  it("การ์ดครบ 200 ใบ ส่งฟรี", () => {
+    const q = computeA5Quote(s, [card(2, 100, 220)]);
+    expect(combineTotals(noA3, q).shipping).toBe(0);
+  });
+  it("การ์ดไม่ถึง 200 แต่ A5 ถึงยอดส่งฟรี ส่งฟรีทั้งกล่อง", () => {
+    const q = computeA5Quote(s, [card(1, 25, 75), { qty: 15, surcharge: 0 }]);
+    expect(combineTotals(noA3, q).shipping).toBe(0);
+  });
+  it("การ์ดไม่ถึง 200 และ A5 ไม่ถึงยอด เก็บ 30 ครั้งเดียว", () => {
+    const q = computeA5Quote(s, [card(1, 25, 75), { qty: 3, surcharge: 0 }]);
+    expect(combineTotals(noA3, q).shipping).toBe(30);
+  });
+  it("การ์ดครบ 200 แต่ A5 ไม่ถึงยอด ยังคิดค่าส่ง A5", () => {
+    const q = computeA5Quote(s, [card(2, 100, 220), { qty: 3, surcharge: 0 }]);
+    expect(combineTotals(noA3, q).shipping).toBe(30);
+  });
+  it("การ์ดสั่งรวมงาน A3+ ที่ส่งฟรีแล้ว ส่งฟรีทั้งกล่อง", () => {
+    const q = computeA5Quote(s, [card(1, 25, 75)]);
+    expect(combineTotals({ subtotal: 500, fixFeeTotal: 0, shipping: 0, totalSheets: 10 }, q).shipping).toBe(0);
+  });
+});

@@ -3,9 +3,9 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { a5NudgeText, a5PriceRange, computeA5Quote, findA5Tier } from "@/lib/a5-pricing";
+import { a5NudgeText, a5PriceRange, computeA5Quote } from "@/lib/a5-pricing";
 import { addToCart, useCart } from "@/lib/client/cart";
-import type { ShopCategory, ShopDesign, ShopProduct } from "@/lib/shop-types";
+import { fixedPriceRange, quoteLineFor, type ShopCategory, type ShopDesign, type ShopProduct } from "@/lib/shop-types";
 import type { PublicSettings } from "@/lib/types";
 import { ArtworkViewer } from "../order/ArtworkViewer";
 import { MiniStepper } from "./MiniStepper";
@@ -15,7 +15,9 @@ export function ProductView({ product: p, category, settings }: { product: ShopP
   const [sheet, setSheet] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const [zoom, setZoom] = useState<{ url: string; name: string } | null>(null);
-  const range = a5PriceRange(settings.a5Tiers, p.sizes.map((s) => s.surcharge));
+  const fixed = p.pricing === "fixed";
+  const range = fixed ? fixedPriceRange(p) : a5PriceRange(settings.a5Tiers, p.sizes.map((s) => s.surcharge));
+  const unitLabel = fixed ? p.unitLabel : "แผ่น";
   const slides = p.images.length ? p.images : p.designs.filter((d) => d.imageUrl).slice(0, 8).map((d) => ({ url: d.imageUrl!, thumbUrl: d.thumbUrl! }));
   const activeDesigns = p.designs.filter((d) => d.active).length;
   const router = useRouter();
@@ -38,14 +40,18 @@ export function ProductView({ product: p, category, settings }: { product: ShopP
         <div>
           <p className="text-2xl font-bold text-brand-600">
             {range.min === range.max ? baht0(range.min) : `${baht0(range.min)} – ${baht0(range.max)}`}
-            <span className="text-sm font-normal text-muted"> / แผ่น</span>
+            <span className="text-sm font-normal text-muted"> / {unitLabel}</span>
           </p>
           <h1 className="mt-1 text-lg font-semibold leading-snug">
             <Badges p={p} className="mr-1.5 inline-flex align-middle" />
             {p.name}
           </h1>
           <p className="mt-1 text-sm text-muted">
-            {p.sold > 0 && <>ขายแล้ว {p.sold.toLocaleString("th-TH")} แผ่น · </>}
+            {p.sold > 0 && (
+              <>
+                ขายแล้ว {p.sold.toLocaleString("th-TH")} {unitLabel} ·{" "}
+              </>
+            )}
             {activeDesigns} ลาย
             {category && (
               <>
@@ -58,17 +64,38 @@ export function ProductView({ product: p, category, settings }: { product: ShopP
           </p>
         </div>
 
-        <div className="card space-y-2 !p-3 text-sm">
-          <p className="font-semibold">ราคาส่ง (คละลาย คละสินค้าได้ทั้งร้าน นับรวมทุกแผ่น A5 ในตะกร้า)</p>
-          <A5PriceTable tiers={settings.a5Tiers} surcharge={p.sizes.length ? Math.min(...p.sizes.map((s) => s.surcharge)) : 0} />
-          <p className="text-xs text-muted">
-            ค่าส่ง {settings.a5ShippingFee} บาท · A5 รวม {settings.a5FreeShippingMin} แผ่นขึ้นไปส่งฟรี
-          </p>
-        </div>
+        {fixed ? (
+          <div className="card space-y-2 !p-3 text-sm">
+            <p className="font-semibold">ราคา</p>
+            <div className="grid grid-cols-3 gap-1.5">
+              {p.sizes.map((s) => (
+                <div key={s.id} className="rounded-xl px-2 py-1.5 text-center ring-1 ring-line">
+                  <p className="text-xs text-muted">{s.name}</p>
+                  <p className="font-bold">{baht0(s.price ?? 0)}</p>
+                </div>
+              ))}
+            </div>
+            <p className="text-xs text-muted">
+              สั่งการ์ดอย่างเดียว ค่าส่ง {settings.fixedShippingFee} บาท · ครบ {settings.fixedFreeShippingUnits} ใบส่งฟรี · สั่งรวมกับสติกเกอร์ที่ถึงยอดส่งฟรีแล้ว ส่งฟรีทั้งกล่อง
+            </p>
+          </div>
+        ) : (
+          <div className="card space-y-2 !p-3 text-sm">
+            <p className="font-semibold">ราคาส่ง (คละลาย คละสินค้าได้ทั้งร้าน นับรวมทุกแผ่น A5 ในตะกร้า)</p>
+            <A5PriceTable tiers={settings.a5Tiers} surcharge={p.sizes.length ? Math.min(...p.sizes.map((s) => s.surcharge)) : 0} />
+            <p className="text-xs text-muted">
+              ค่าส่ง {settings.a5ShippingFee} บาท · A5 รวม {settings.a5FreeShippingMin} แผ่นขึ้นไปส่งฟรี
+            </p>
+          </div>
+        )}
 
         <dl className="card grid grid-cols-[auto_1fr] gap-x-4 gap-y-1.5 !p-3 text-sm">
-          <dt className="text-muted">ขนาดแผ่น</dt>
-          <dd>A5</dd>
+          {!fixed && (
+            <>
+              <dt className="text-muted">ขนาดแผ่น</dt>
+              <dd>A5</dd>
+            </>
+          )}
           {p.piecesPerSheet && (
             <>
               <dt className="text-muted">จำนวนดวง</dt>
@@ -83,7 +110,7 @@ export function ProductView({ product: p, category, settings }: { product: ShopP
           )}
           {p.sizes.length > 0 && (
             <>
-              <dt className="text-muted">ขนาด</dt>
+              <dt className="text-muted">{p.optionLabel}</dt>
               <dd>{p.sizes.map((s) => s.name).join(" / ")}</dd>
             </>
           )}
@@ -151,7 +178,7 @@ export function ProductView({ product: p, category, settings }: { product: ShopP
           onClose={() => setSheet(false)}
           onAdded={(n) => {
             setSheet(false);
-            setToast(`เพิ่มลงตะกร้าแล้ว ${n} แผ่น`);
+            setToast(`เพิ่มลงตะกร้าแล้ว ${n} ${unitLabel}`);
             setTimeout(() => setToast(null), 3500);
           }}
         />
@@ -207,14 +234,15 @@ function OptionSheet({
   const needSize = p.sizes.length > 1 && !sizeId;
   const size = p.sizes.find((s) => s.id === sizeId) ?? null;
   const picked = Object.values(qty).reduce((a, b) => a + b, 0);
-  const inCart = cart.reduce((a, l) => a + l.qty, 0);
-  // ราคาขั้นบันไดคิดจากแผ่น A5 รวมทั้งตะกร้า + ที่กำลังเลือก
+  const fixed = p.pricing === "fixed";
+  const unitLabel = fixed ? p.unitLabel : "แผ่น";
+  // ราคาขั้นบันไดคิดจากแผ่น A5 รวมทั้งตะกร้า (ไม่นับสินค้าราคาคงที่) + ที่กำลังเลือก
+  const inCart = cart.reduce((a, l) => a + (l.fixed ? 0 : l.qty), 0);
   const quote = useMemo(
-    () => computeA5Quote(settings, [{ qty: inCart, surcharge: 0 }, { qty: picked, surcharge: size?.surcharge ?? 0 }]),
-    [settings, inCart, picked, size],
+    () => computeA5Quote(settings, [{ qty: inCart, surcharge: 0 }, quoteLineFor(p, size, picked)]),
+    [settings, inCart, picked, size, p],
   );
-  const unit = findA5Tier(settings.a5Tiers, inCart + picked).price + (size?.surcharge ?? 0);
-
+  const unit = quote.lines[1]?.unitPrice ?? 0;
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
     window.addEventListener("keydown", onKey);
@@ -230,7 +258,7 @@ function OptionSheet({
   function add() {
     const lines = Object.entries(qty)
       .filter(([, n]) => n > 0)
-      .map(([designId, n]) => ({ productId: p.id, designId, sizeId: p.sizes.length ? sizeId : null, qty: n }));
+      .map(([designId, n]) => ({ productId: p.id, designId, sizeId: p.sizes.length ? sizeId : null, qty: n, ...(fixed ? { fixed: true } : {}) }));
     if (!lines.length) return;
     addToCart(lines);
     onAdded(picked);
@@ -249,7 +277,7 @@ function OptionSheet({
           </div>
           <div className="min-w-0 flex-1">
             <p className="text-lg font-bold text-brand-600">
-              {baht0(unit)} <span className="text-sm font-normal text-muted">/ แผ่น</span>
+              {baht0(unit)} <span className="text-sm font-normal text-muted">/ {unitLabel}</span>
             </p>
             <p className="line-clamp-2 text-sm">{p.name}</p>
           </div>
@@ -261,8 +289,8 @@ function OptionSheet({
         <div className="flex-1 space-y-4 overflow-y-auto p-4">
           {p.sizes.length > 1 && (
             <div>
-              <p className="mb-2 text-sm font-semibold">ขนาด</p>
-              <div className="flex flex-wrap gap-2" role="radiogroup" aria-label="ขนาด">
+              <p className="mb-2 text-sm font-semibold">{p.optionLabel}</p>
+              <div className="flex flex-wrap gap-2" role="radiogroup" aria-label={p.optionLabel}>
                 {p.sizes.map((s) => (
                   <button
                     key={s.id}
@@ -273,17 +301,21 @@ function OptionSheet({
                     className={`rounded-xl px-3.5 py-2 text-sm ring-1 ${sizeId === s.id ? "bg-brand-50 font-semibold text-brand-700 ring-brand-500" : "ring-line"}`}
                   >
                     {s.name}
-                    {s.surcharge > 0 && <span className="text-xs text-muted"> +{baht0(s.surcharge)}</span>}
+                    {fixed ? (
+                      <span className="text-xs text-muted"> {baht0(s.price ?? 0)}</span>
+                    ) : (
+                      s.surcharge > 0 && <span className="text-xs text-muted"> +{baht0(s.surcharge)}</span>
+                    )}
                   </button>
                 ))}
               </div>
-              {needSize && <p className="mt-1.5 text-xs font-medium text-brand-600">เลือกขนาดก่อน แล้วใส่จำนวนแต่ละลาย</p>}
+              {needSize && <p className="mt-1.5 text-xs font-medium text-brand-600">เลือก{p.optionLabel}ก่อน แล้วใส่จำนวนแต่ละลาย</p>}
             </div>
           )}
 
           <div>
             <p className="mb-2 text-sm font-semibold">
-              ลาย <span className="font-normal text-muted">(ใส่จำนวนแผ่นได้หลายลายพร้อมกัน แตะรูปเพื่อขยาย)</span>
+              ลาย <span className="font-normal text-muted">(ใส่จำนวน{unitLabel}ได้หลายลายพร้อมกัน แตะรูปเพื่อขยาย)</span>
             </p>
             <div className="divide-y divide-line">
               {p.designs.map((d) => (
@@ -300,7 +332,7 @@ function OptionSheet({
                   </div>
                   {d.active ? (
                     <MiniStepper
-                      label={`จำนวนแผ่น ลาย ${d.name}`}
+                      label={`จำนวน${unitLabel} ลาย ${d.name}`}
                       value={qty[d.id] ?? 0}
                       disabled={needSize}
                       onChange={(v) => setQty((q) => ({ ...q, [d.id]: v }))}
@@ -317,13 +349,14 @@ function OptionSheet({
         <div className="border-t border-line p-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
           <div className="mb-2 flex items-baseline justify-between">
             <span className="text-sm text-muted">
-              เลือก {picked} แผ่น{inCart > 0 && ` (ในตะกร้า A5 อีก ${inCart} แผ่น)`}
+              เลือก {picked} {unitLabel}
+              {!fixed && inCart > 0 && ` (ในตะกร้า A5 อีก ${inCart} แผ่น)`}
             </span>
             <span className="text-xl font-bold">{baht0(unit * picked)}</span>
           </div>
-          {quote.nudge && picked > 0 && <p className="mb-2 text-sm font-medium text-brand-600">✨ {a5NudgeText(quote.nudge)}</p>}
+          {!fixed && quote.nudge && picked > 0 && <p className="mb-2 text-sm font-medium text-brand-600">✨ {a5NudgeText(quote.nudge)}</p>}
           <button type="button" className="btn-primary w-full" disabled={!picked || needSize} onClick={add}>
-            {needSize ? "เลือกขนาดก่อน" : picked ? `เพิ่มลงตะกร้า ${picked} แผ่น` : "ใส่จำนวนอย่างน้อย 1 ลาย"}
+            {needSize ? `เลือก${p.optionLabel}ก่อน` : picked ? `เพิ่มลงตะกร้า ${picked} ${unitLabel}` : "ใส่จำนวนอย่างน้อย 1 ลาย"}
           </button>
         </div>
       </div>

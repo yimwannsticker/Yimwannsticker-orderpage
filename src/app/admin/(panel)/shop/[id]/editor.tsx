@@ -36,7 +36,10 @@ export interface EditorProduct {
   badgeBest: boolean;
   badgeNew: boolean;
   active: boolean;
-  sizes: { id?: string; key?: string; name: string; surcharge: number }[];
+  pricing: "a5" | "fixed";
+  optionLabel: string;
+  unitLabel: string;
+  sizes: { id?: string; key?: string; name: string; surcharge: number; price: number | null; units: number | null }[];
   designs: EditorDesign[];
 }
 
@@ -159,7 +162,10 @@ export function ProductEditor({
         badgeBest: p.badgeBest,
         badgeNew: p.badgeNew,
         active: p.active,
-        sizes: p.sizes.map((s) => ({ id: s.id, name: s.name, surcharge: s.surcharge })),
+        pricing: p.pricing,
+        optionLabel: p.optionLabel,
+        unitLabel: p.unitLabel,
+        sizes: p.sizes.map((s) => ({ id: s.id, name: s.name, surcharge: s.surcharge, price: s.price, units: s.units })),
         designs: p.designs.map((d) => ({ id: d.id, name: d.name, sku: d.sku, imagePath: d.imagePath, thumbPath: d.thumbPath, active: d.active })),
       });
       if (!r.ok) return setError(r.error);
@@ -213,6 +219,17 @@ export function ProductEditor({
                 ))}
             </select>
           </Field>
+          <Field label="ประเภทราคา" hint={p.pricing === "fixed" ? "ราคาตามตัวเลือกด้านล่าง ไม่นับเป็นแผ่น A5 ค่าส่งใช้เกณฑ์การ์ด" : "ราคาส่งขั้นบันไดตามแผ่น A5 รวมทั้งตะกร้า (ตั้งในหน้าตั้งค่า)"}>
+            <select className="input" value={p.pricing} onChange={(e) => set("pricing", e.target.value as "a5" | "fixed")}>
+              <option value="a5">สติกเกอร์ A5 (ราคาขั้นบันได)</option>
+              <option value="fixed">ราคาคงที่ (เช่น การ์ดแพ็ค)</option>
+            </select>
+          </Field>
+          {p.pricing === "fixed" && (
+            <Field label="หน่วยที่ขาย" hint="เช่น แพ็ค / ชุด / ชิ้น">
+              <input className="input" value={p.unitLabel} onChange={(e) => set("unitLabel", e.target.value)} />
+            </Field>
+          )}
           <Field label="จำนวนดวงต่อแผ่น">
             <input
               className="input"
@@ -273,30 +290,66 @@ export function ProductEditor({
 
       <section className="card space-y-3">
         <div className="flex items-center justify-between">
-          <h2 className="font-bold">ขนาด (ไม่บังคับ)</h2>
-          <button type="button" className="btn-secondary btn-sm" onClick={() => set("sizes", [...p.sizes, { key: tmpKey(), name: "", surcharge: 0 }])}>
-            + เพิ่มขนาด
+          <h2 className="font-bold">ตัวเลือก {p.pricing === "fixed" ? "(ต้องมี พร้อมราคา)" : "(ไม่บังคับ)"}</h2>
+          <button
+            type="button"
+            className="btn-secondary btn-sm"
+            onClick={() => set("sizes", [...p.sizes, { key: tmpKey(), name: "", surcharge: 0, price: null, units: p.pricing === "fixed" ? 1 : null }])}
+          >
+            + เพิ่ม{p.optionLabel}
           </button>
         </div>
-        <p className="text-xs text-muted">ถ้ามีมากกว่า 1 ขนาด ลูกค้าต้องเลือกขนาดก่อน ส่วนต่างราคาบวกเพิ่มจากราคาขั้นบันไดต่อแผ่น</p>
+        <Field label="ชื่อปุ่มตัวเลือก" hint="ลูกค้าเห็นเป็นหัวข้อ เช่น ขนาด / สี / แพ็ค">
+          <input className="input max-w-xs" value={p.optionLabel} onChange={(e) => set("optionLabel", e.target.value)} />
+        </Field>
+        <p className="text-xs text-muted">
+          {p.pricing === "fixed"
+            ? "ใส่ราคาต่อหน่วย และจำนวนชิ้นต่อหน่วย (เช่น แพ็ค 25 ใบ = 25) ใช้นับเกณฑ์ส่งฟรีของการ์ด"
+            : "ถ้ามีมากกว่า 1 ตัวเลือก ลูกค้าต้องเลือกก่อน ส่วนต่างราคาบวกเพิ่มจากราคาขั้นบันไดต่อแผ่น"}
+        </p>
         {p.sizes.map((s) => (
           <div key={keyOf(s)} className="flex items-center gap-2">
             <input
               className="input"
-              placeholder="ชื่อขนาด เช่น ดวง 3 ซม."
+              placeholder={p.pricing === "fixed" ? "เช่น แพ็ค 25 ใบ" : "ชื่อขนาด เช่น ดวง 3 ซม."}
               value={s.name}
               onChange={(e) => set("sizes", p.sizes.map((x) => (keyOf(x) === keyOf(s) ? { ...x, name: e.target.value } : x)))}
             />
-            <div className="flex w-40 shrink-0 items-center gap-1">
-              <span className="text-sm text-muted">+</span>
-              <input
-                className="input"
-                inputMode="decimal"
-                value={s.surcharge}
-                onChange={(e) => set("sizes", p.sizes.map((x) => (keyOf(x) === keyOf(s) ? { ...x, surcharge: Number(e.target.value) || 0 } : x)))}
-              />
-              <span className="text-sm text-muted">บาท</span>
-            </div>
+            {p.pricing === "fixed" ? (
+              <>
+                <div className="flex w-36 shrink-0 items-center gap-1">
+                  <input
+                    className="input"
+                    inputMode="decimal"
+                    aria-label="ราคา"
+                    value={s.price ?? ""}
+                    onChange={(e) => set("sizes", p.sizes.map((x) => (keyOf(x) === keyOf(s) ? { ...x, price: Number(e.target.value) || null } : x)))}
+                  />
+                  <span className="text-sm text-muted">บาท</span>
+                </div>
+                <div className="flex w-32 shrink-0 items-center gap-1">
+                  <input
+                    className="input"
+                    inputMode="numeric"
+                    aria-label="จำนวนชิ้นต่อหน่วย"
+                    value={s.units ?? ""}
+                    onChange={(e) => set("sizes", p.sizes.map((x) => (keyOf(x) === keyOf(s) ? { ...x, units: Number(e.target.value.replace(/\D/g, "")) || null } : x)))}
+                  />
+                  <span className="text-sm text-muted">ใบ</span>
+                </div>
+              </>
+            ) : (
+              <div className="flex w-40 shrink-0 items-center gap-1">
+                <span className="text-sm text-muted">+</span>
+                <input
+                  className="input"
+                  inputMode="decimal"
+                  value={s.surcharge}
+                  onChange={(e) => set("sizes", p.sizes.map((x) => (keyOf(x) === keyOf(s) ? { ...x, surcharge: Number(e.target.value) || 0 } : x)))}
+                />
+                <span className="text-sm text-muted">บาท</span>
+              </div>
+            )}
             <button type="button" className="btn-ghost btn-sm text-bad" onClick={() => set("sizes", p.sizes.filter((x) => keyOf(x) !== keyOf(s)))}>
               ลบ
             </button>

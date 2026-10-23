@@ -13,9 +13,11 @@ export interface SlipData {
   phone: string;
   address: string;
   note: string | null;
-  groups: { product: string; rows: { sku: string; label: string; qty: number }[] }[];
+  groups: { product: string; rows: { sku: string; label: string; qty: number; unit: string | null }[] }[];
   a3: { label: string; detail: string; qty: number; free: number }[];
   a5Sheets: number;
+  /** การ์ด (ราคาคงที่) รวมกี่ใบ */
+  fixedUnits: number;
   a3Sheets: number;
   freeSheets: number;
 }
@@ -31,7 +33,7 @@ const MM = 96 / 25.4;
 
 type Row =
   | { kind: "group"; text: string }
-  | { kind: "a5"; sku: string; label: string; qty: number }
+  | { kind: "a5"; sku: string; label: string; qty: number; unit: string | null }
   | { kind: "a3"; label: string; detail: string; qty: number; free: number };
 
 function rowsOf(s: SlipData): Row[] {
@@ -123,6 +125,7 @@ function RowView({ r, f }: { r: Row; f: number }) {
         <span>{r.label}</span>
         <span className="text-right font-bold" style={{ fontSize: `${f + 2}pt` }}>
           ×{r.qty}
+          {r.unit && <span style={{ fontSize: `${f}pt` }}> {r.unit}</span>}
         </span>
       </div>
     );
@@ -143,7 +146,7 @@ function RowView({ r, f }: { r: Row; f: number }) {
 }
 
 function Footer({ s, sheetName, f }: { s: SlipData; sheetName: string; f: number }) {
-  const parts = [s.a5Sheets ? `A5 ${s.a5Sheets} แผ่น` : null, s.a3Sheets ? `${sheetName} ${s.a3Sheets} แผ่น` : null, s.freeSheets ? `แถม ${s.freeSheets} แผ่น` : null];
+  const parts = [s.a5Sheets ? `A5 ${s.a5Sheets} แผ่น` : null, s.fixedUnits ? `การ์ด ${s.fixedUnits} ใบ` : null, s.a3Sheets ? `${sheetName} ${s.a3Sheets} แผ่น` : null, s.freeSheets ? `แถม ${s.freeSheets} แผ่น` : null];
   return (
     <div className="mt-1 border-t-2 border-black pt-1 font-bold" style={{ fontSize: `${f + 1}pt` }}>
       รวม {parts.filter(Boolean).join(" · ") || "-"}

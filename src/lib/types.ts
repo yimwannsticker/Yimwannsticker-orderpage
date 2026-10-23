@@ -91,6 +91,9 @@ export interface Settings {
   a5ShippingFee: number;
   /** A5 ครบกี่แผ่นส่งฟรี (นับแยกจาก A3+) */
   a5FreeShippingMin: number;
+  /** สินค้าราคาคงที่ (การ์ด): ค่าส่งเมื่อสั่งไม่ถึงเกณฑ์ และเกณฑ์ส่งฟรี (นับเป็นชิ้น/ใบ) */
+  fixedShippingFee: number;
+  fixedFreeShippingUnits: number;
   /** แบนเนอร์หน้าแรก (รูปใน R2) */
   banners: Banner[];
 }
@@ -113,6 +116,8 @@ export interface A5CartLine {
   designId: string;
   sizeId: string | null;
   qty: number;
+  /** สินค้าราคาคงที่ (ไม่นับเป็นแผ่น A5) ใช้แสดงผลในเครื่องเท่านั้น ราคาจริงคิดที่ server */
+  fixed?: boolean;
 }
 
 /** ส่วนที่ส่งให้ฝั่งลูกค้าได้ (ไม่มีข้อมูลภายใน) */

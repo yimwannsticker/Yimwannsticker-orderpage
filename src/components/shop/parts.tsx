@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { a5PriceRange } from "@/lib/a5-pricing";
-import type { ShopProduct } from "@/lib/shop-types";
+import { fixedPriceRange, type ShopProduct } from "@/lib/shop-types";
 import type { A5Tier } from "@/lib/types";
 
 export const baht0 = (n: number) => `฿${n.toLocaleString("th-TH", { maximumFractionDigits: 2 })}`;
@@ -17,7 +17,7 @@ export function Badges({ p, className = "" }: { p: Pick<ShopProduct, "badgeBest"
 
 /** การ์ดสินค้าในกริด 2 คอลัมน์ */
 export function ProductCard({ p, tiers }: { p: ShopProduct; tiers: A5Tier[] }) {
-  const range = a5PriceRange(tiers, p.sizes.map((s) => s.surcharge));
+  const range = p.pricing === "fixed" ? fixedPriceRange(p) : a5PriceRange(tiers, p.sizes.map((s) => s.surcharge));
   const cover = p.images[0]?.thumbUrl ?? p.designs.find((d) => d.thumbUrl)?.thumbUrl ?? null;
   return (
     <Link href={`/p/${p.id}`} className="flex flex-col overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-line transition active:scale-[0.98]">
