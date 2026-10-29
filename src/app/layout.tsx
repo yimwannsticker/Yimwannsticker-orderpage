@@ -1,5 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Noto_Sans_Thai } from "next/font/google";
+import { Analytics } from "@/components/Analytics";
+import { getSettings } from "@/lib/server/settings";
 import "./globals.css";
 
 const thai = Noto_Sans_Thai({
@@ -26,10 +28,16 @@ export const viewport: Viewport = {
   themeColor: "#e0457b",
 };
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  const ga = await getSettings()
+    .then((s) => s.gaMeasurementId)
+    .catch(() => "");
   return (
     <html lang="th" className={`${thai.variable} h-full antialiased`}>
-      <body className="min-h-full font-sans">{children}</body>
+      <body className="min-h-full font-sans">
+        {children}
+        {/^G-[A-Z0-9]{4,15}$/.test(ga) && <Analytics id={ga} />}
+      </body>
     </html>
   );
 }

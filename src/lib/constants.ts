@@ -30,6 +30,8 @@ export const DEFAULT_SETTINGS: Settings = {
   bankAccountName: "",
   lineTrackingMessage: "ออเดอร์ {orderNo} จัดส่งแล้ว 🎉\nขนส่ง: {carrier}\nเลขพัสดุ: {trackingNo}",
   lineReplyFooter: "ขอบคุณที่อุดหนุน Yimwann Sticker ค่ะ",
+  lineNotify: { paid: true, producing: true, slipRejected: true, reupload: true, cancelled: false, quotaGuard: true },
+  gaMeasurementId: "",
   fileRetentionDays: 365,
   maxFileMb: 200,
   slipVerify: { enabled: false, provider: "slipok" },

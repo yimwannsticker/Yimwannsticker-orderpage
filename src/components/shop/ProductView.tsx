@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { a5NudgeText, a5PriceRange, computeA5Quote } from "@/lib/a5-pricing";
 import { addToCart, useCart } from "@/lib/client/cart";
+import { track } from "@/lib/client/track";
 import { fixedPriceRange, quoteLineFor, type ShopCategory, type ShopDesign, type ShopProduct } from "@/lib/shop-types";
 import type { PublicSettings } from "@/lib/types";
 import { ArtworkViewer } from "../order/ArtworkViewer";
@@ -20,6 +21,10 @@ export function ProductView({ product: p, category, settings }: { product: ShopP
   const unitLabel = fixed ? p.unitLabel : "แผ่น";
   const slides = p.images.length ? p.images : p.designs.filter((d) => d.imageUrl).slice(0, 8).map((d) => ({ url: d.imageUrl!, thumbUrl: d.thumbUrl! }));
   const activeDesigns = p.designs.filter((d) => d.active).length;
+  useEffect(() => {
+    track("view_item", { value: range.min, items: [{ item_id: p.id, item_name: p.name, price: range.min }] });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [p.id]);
   const router = useRouter();
 
   return (
@@ -261,6 +266,16 @@ function OptionSheet({
       .map(([designId, n]) => ({ productId: p.id, designId, sizeId: p.sizes.length ? sizeId : null, qty: n, ...(fixed ? { fixed: true } : {}) }));
     if (!lines.length) return;
     addToCart(lines);
+    track("add_to_cart", {
+      value: unit * picked,
+      items: lines.map((l) => ({
+        item_id: p.id,
+        item_name: p.name,
+        item_variant: [p.designs.find((d) => d.id === l.designId)?.sku, size?.name].filter(Boolean).join(" · "),
+        price: unit,
+        quantity: l.qty,
+      })),
+    });
     onAdded(picked);
   }
 

@@ -9,7 +9,7 @@ import { requireStaff, type Role } from "@/lib/server/auth";
 import { saveBackup } from "@/lib/server/backup";
 import { parseMessageLines } from "@/lib/greeting";
 import { mergeSettings, saveSettings } from "@/lib/server/settings";
-import { markShipped, removeIfUnreferenced } from "@/lib/server/orders";
+import { markShipped, notifyLine, removeIfUnreferenced } from "@/lib/server/orders";
 import { db } from "@/lib/supabase/admin";
 import { authClient } from "@/lib/supabase/server";
 import type { OrderStatus, Settings } from "@/lib/types";
@@ -35,12 +35,14 @@ export async function markSeen(orderId: string) {
 
 export async function confirmPayment(orderId: string): Promise<Result> {
   await requireStaff("admin");
-  const { error } = await db()
+  const { data, error } = await db()
     .from("orders")
     .update({ status: "paid", paid_at: new Date().toISOString(), slip_rejected_reason: null })
     .eq("id", orderId)
-    .eq("status", "pending_slip");
+    .eq("status", "pending_slip")
+    .select("id");
   if (error) return { ok: false, error: error.message };
+  if (data?.length) await notifyLine(orderId, "paid");
   refresh(orderId);
   return { ok: true };
 }
@@ -53,6 +55,7 @@ export async function rejectSlip(orderId: string, reason: string): Promise<Resul
     .update({ slip_rejected_reason: reason.trim(), status: "pending_slip", paid_at: null })
     .eq("id", orderId);
   if (error) return { ok: false, error: error.message };
+  await notifyLine(orderId, "slipRejected", reason.trim());
   refresh(orderId);
   return { ok: true };
 }
@@ -76,6 +79,7 @@ export async function setStatus(orderId: string, status: OrderStatus): Promise<R
   if (status === "cancelled") stamp.cancelled_at = now;
   const { error } = await db().from("orders").update({ status, ...stamp }).eq("id", orderId);
   if (error) return { ok: false, error: error.message };
+  if (status !== cur.status && (status === "paid" || status === "producing" || status === "cancelled")) await notifyLine(orderId, status);
   refresh(orderId);
   return { ok: true };
 }
@@ -90,8 +94,15 @@ export async function requestReupload(itemId: string, reason: string): Promise<R
     .select("order_id")
     .single();
   if (error || !data) return { ok: false, error: error?.message ?? "ไม่พบรายการ" };
+  const line = await notifyLine(data.order_id, "reupload", reason.trim());
   refresh(data.order_id);
-  return { ok: true, message: "บันทึกแล้ว ลูกค้าจะเห็นคำขอที่หน้าเช็คสถานะ (ส่งลิงก์ให้ลูกค้าได้)" };
+  return {
+    ok: true,
+    message:
+      line === "sent"
+        ? "บันทึกแล้ว แจ้งลูกค้าทาง LINE แล้ว"
+        : "บันทึกแล้ว ลูกค้าจะเห็นคำขอที่หน้าเช็คสถานะ (ส่งลิงก์ให้ลูกค้าได้)",
+  };
 }
 
 export async function cancelReupload(itemId: string): Promise<Result> {
@@ -257,6 +268,10 @@ export async function updateSettings(data: Settings): Promise<Result> {
     return { ok: false, error: "ตารางราคาไม่ถูกต้อง" };
   if (new Set(s.tiers.map((t) => t.min)).size !== s.tiers.length) return { ok: false, error: "ช่วงจำนวนในตารางราคาซ้ำกัน" };
   s.tiers = [...s.tiers].sort((a, b) => a.min - b.min);
+  s.gaMeasurementId = String(s.gaMeasurementId ?? "").trim().toUpperCase();
+  if (s.gaMeasurementId && !/^G-[A-Z0-9]{4,15}$/.test(s.gaMeasurementId))
+    return { ok: false, error: "Measurement ID ของ Google Analytics ต้องขึ้นต้นด้วย G- เช่น G-AB12CD34EF" };
+  s.lineNotify = Object.fromEntries(Object.entries(s.lineNotify).map(([k, v]) => [k, Boolean(v)])) as Settings["lineNotify"];
   s.welcomeMessages = parseMessageLines((s.welcomeMessages ?? []).join("\n"));
   s.thankYouMessages = parseMessageLines((s.thankYouMessages ?? []).join("\n"));
   if (!s.a5Tiers.length || s.a5Tiers.some((t) => !(t.min > 0) || !(t.price >= 0)))

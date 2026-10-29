@@ -145,3 +145,6 @@ create table if not exists public.backups (
   created_at timestamptz not null default now()
 );
 alter table public.backups enable row level security;
+
+-- แจ้งสถานะทาง LINE ที่ส่งไปแล้ว { paid: "เวลา", producing: "เวลา" } กันส่งซ้ำเมื่อสลับสถานะไปมา
+alter table public.orders add column if not exists line_events jsonb not null default '{}';

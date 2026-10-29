@@ -5,6 +5,7 @@ import { useMemo, useState } from "react";
 import { a5NudgeText, combineTotals, computeA5Quote } from "@/lib/a5-pricing";
 import { resolveCart, type ResolvedLine } from "@/lib/cart-resolve";
 import { sameLine, setCart, updateDraftItems, useCart, useDraftItems } from "@/lib/client/cart";
+import { track } from "@/lib/client/track";
 import { productLabel, shapeLabel } from "@/lib/constants";
 import { baht } from "@/lib/format";
 import { computeQuote, itemProblem, nudgeText } from "@/lib/pricing";
@@ -199,7 +200,12 @@ export function CartView({ settings, catalog }: { settings: PublicSettings; cata
             <p className="text-xs text-muted">ยอดรวม</p>
             <p className="text-xl font-bold text-brand-600">{baht(totals.total)}</p>
           </div>
-          <Link href={checkout} className={`btn-primary ${bad.length ? "pointer-events-none opacity-50" : ""}`} aria-disabled={bad.length > 0}>
+          <Link
+            href={checkout}
+            onClick={() => track("begin_checkout", { value: totals.total, shipping: totals.shipping })}
+            className={`btn-primary ${bad.length ? "pointer-events-none opacity-50" : ""}`}
+            aria-disabled={bad.length > 0}
+          >
             สั่งซื้อ
           </Link>
         </div>

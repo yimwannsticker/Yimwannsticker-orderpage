@@ -77,6 +77,10 @@ export interface Settings {
   lineTrackingMessage: string;
   /** ข้อความนำหน้าเวลาบอทตอบสถานะ */
   lineReplyFooter: string;
+  /** แจ้งลูกค้าทาง LINE เมื่อสถานะออเดอร์เปลี่ยน (เลขแทร็คแจ้งเสมอ) */
+  lineNotify: LineNotifySettings;
+  /** Google Analytics 4 (G-XXXXXXX) ว่าง = ไม่เก็บสถิติ */
+  gaMeasurementId: string;
   fileRetentionDays: number;
   maxFileMb: number;
   slipVerify: { enabled: boolean; provider: "slipok" | "easyslip" };
@@ -121,7 +125,14 @@ export interface A5CartLine {
 }
 
 /** ส่วนที่ส่งให้ฝั่งลูกค้าได้ (ไม่มีข้อมูลภายใน) */
-export type PublicSettings = Omit<Settings, "notifyEmail" | "slipVerify" | "lineReplyFooter" | "lineTrackingMessage">;
+export type PublicSettings = Omit<Settings, "notifyEmail" | "slipVerify" | "lineReplyFooter" | "lineTrackingMessage" | "lineNotify">;
+
+export type LineEvent = "paid" | "producing" | "slipRejected" | "reupload" | "cancelled";
+
+export type LineNotifySettings = Record<LineEvent, boolean> & {
+  /** โควตาข้อความเดือนนี้ใกล้หมด (เหลือไม่ถึง 10%) งดแจ้งสถานะทั่วไป เก็บไว้แจ้งเลขแทร็ค สลิปไม่ผ่าน และขอไฟล์ใหม่ */
+  quotaGuard: boolean;
+};
 
 export type OrderStatus = "pending_slip" | "paid" | "producing" | "shipped" | "cancelled";
 

@@ -2,7 +2,8 @@ import "server-only";
 import crypto from "node:crypto";
 import { carrierInfo, trackingUrl } from "../constants";
 
-const API = "https://api.line.me";
+// ตอนทดสอบในเครื่องชี้ไปที่ server จำลองได้ (ใช้ไม่ได้บนเว็บจริง)
+const API = (process.env.NODE_ENV !== "production" && process.env.LINE_API_DEV_BASE) || "https://api.line.me";
 
 export function lineLoginEnabled() {
   return Boolean(process.env.LINE_LOGIN_CHANNEL_ID && process.env.LINE_LOGIN_CHANNEL_SECRET);
@@ -77,6 +78,34 @@ export async function pushTracking(
           { type: "button", style: "primary", color: "#E0457B", action: { type: "uri", label: "ติดตามพัสดุ", uri: trackUrl } },
           { type: "button", style: "link", action: { type: "uri", label: "ดูรายละเอียดออเดอร์", uri: o.statusUrl } },
         ],
+      },
+    },
+  };
+  return call("/v2/bot/message/push", { method: "POST", body: JSON.stringify({ to, messages: [flex] }) });
+}
+
+/** แจ้งสถานะออเดอร์ (การ์ดหัวข้อ + ข้อความ + ปุ่มดูออเดอร์) */
+export async function pushStatus(to: string, m: { title: string; text: string; orderNo: string; statusUrl: string; button?: string }) {
+  const flex = {
+    type: "flex",
+    altText: `${m.title} · ${m.orderNo}`.slice(0, 390),
+    contents: {
+      type: "bubble",
+      body: {
+        type: "box",
+        layout: "vertical",
+        spacing: "md",
+        contents: [
+          { type: "text", text: m.title, weight: "bold", size: "lg", color: "#E0457B", wrap: true },
+          { type: "text", text: m.text, wrap: true, size: "sm", color: "#555555" },
+          { type: "separator" },
+          row("เลขออเดอร์", m.orderNo),
+        ],
+      },
+      footer: {
+        type: "box",
+        layout: "vertical",
+        contents: [{ type: "button", style: "primary", color: "#E0457B", action: { type: "uri", label: m.button ?? "ดูรายละเอียดออเดอร์", uri: m.statusUrl } }],
       },
     },
   };

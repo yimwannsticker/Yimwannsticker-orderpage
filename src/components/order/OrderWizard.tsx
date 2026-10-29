@@ -6,6 +6,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { a5NudgeText, combineTotals, computeA5Quote } from "@/lib/a5-pricing";
 import { resolveCart } from "@/lib/cart-resolve";
 import { clearCart, getCart, useCart } from "@/lib/client/cart";
+import { track } from "@/lib/client/track";
 import { quoteLineFor, type ShopCatalog } from "@/lib/shop-types";
 import { productLabel, shapeLabel } from "@/lib/constants";
 import { itemCheck, perSheet, sizeText } from "@/lib/sticker-size";
@@ -425,6 +426,21 @@ export function OrderWizard({ settings, catalog }: { settings: PublicSettings; c
         setError(json.error || "ส่งออเดอร์ไม่สำเร็จ");
         return;
       }
+      track("purchase", {
+        transaction_id: json.orderNo,
+        value: totals.total,
+        shipping: totals.shipping,
+        items: [
+          ...a5Ok.map((r, i) => ({
+            item_id: r.line.productId,
+            item_name: r.product?.name ?? "",
+            item_variant: r.design?.sku ?? "",
+            price: a5q.lines[i]?.unitPrice ?? 0,
+            quantity: r.line.qty,
+          })),
+          ...(quote.totalSheets ? [{ item_id: "a3-print", item_name: "สั่งพิมพ์ไฟล์ A3+", quantity: quote.totalSheets }] : []),
+        ],
+      });
       localStorage.removeItem(DRAFT_KEY);
       clearCart();
       setDone(json);

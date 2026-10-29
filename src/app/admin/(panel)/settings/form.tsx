@@ -245,6 +245,41 @@ export function SettingsForm({
           hint="ใช้ {orderNo} {trackingNo} {carrier} แทนค่าได้ · ส่ง 1 ข้อความต่อออเดอร์เท่านั้น"
         />
         <Text label="ข้อความท้ายเวลาบอทตอบสถานะ" value={s.lineReplyFooter} onChange={(v) => set("lineReplyFooter", v)} />
+        <div className="space-y-2">
+          <p className="label">แจ้งลูกค้าทาง LINE เมื่อสถานะเปลี่ยน (เฉพาะลูกค้าที่เชื่อม LINE)</p>
+          {(
+            [
+              ["paid", "ยืนยันชำระเงินแล้ว (ร้านกดยืนยันสลิปเอง)"],
+              ["producing", "เริ่มผลิตแล้ว"],
+              ["slipRejected", "สลิปไม่ผ่าน ขอสลิปใหม่"],
+              ["reupload", "ขอไฟล์ใหม่"],
+              ["cancelled", "ยกเลิกออเดอร์"],
+            ] as const
+          ).map(([k, label]) => (
+            <label key={k} className="flex items-center gap-2 text-sm">
+              <input
+                type="checkbox"
+                className="h-5 w-5 accent-brand-500"
+                checked={s.lineNotify[k]}
+                onChange={(e) => set("lineNotify", { ...s.lineNotify, [k]: e.target.checked })}
+              />
+              {label}
+            </label>
+          ))}
+          <label className="flex items-center gap-2 text-sm">
+            <input
+              type="checkbox"
+              className="h-5 w-5 accent-brand-500"
+              checked={s.lineNotify.quotaGuard}
+              onChange={(e) => set("lineNotify", { ...s.lineNotify, quotaGuard: e.target.checked })}
+            />
+            โควตาข้อความเหลือไม่ถึง 10% งดแจ้ง &quot;ชำระแล้ว / เริ่มผลิต / ยกเลิก&quot; ไว้ก่อน (เลขแทร็ค สลิปไม่ผ่าน ขอไฟล์ใหม่ ยังส่งเสมอ)
+          </label>
+          <p className="text-xs text-muted">
+            แต่ละเรื่องส่ง 1 ข้อความต่อออเดอร์ (สลิปไม่ผ่าน / ขอไฟล์ใหม่ ส่งทุกครั้ง) · LINE OA แพ็กเกจฟรีส่งได้ประมาณ 300 ข้อความต่อเดือน
+            ถ้าเปิดครบ 1 ออเดอร์ใช้ราว 3 ข้อความ (ชำระแล้ว เริ่มผลิต เลขแทร็ค) · ดูยอดที่ใช้ไปได้ที่หน้าออเดอร์
+          </p>
+        </div>
         <p className="text-xs text-muted">
           LINE Login: {env.lineLogin ? "✅ พร้อม" : "❌ ยังไม่ได้ตั้งค่า"} · LINE Messaging API: {env.lineMessaging ? "✅ พร้อม" : "❌ ยังไม่ได้ตั้งค่า"}
         </p>
@@ -257,6 +292,15 @@ export function SettingsForm({
         </p>
         <Lines label="ทักทายลูกค้าเก่า (หน้าสั่งพิมพ์)" value={s.welcomeMessages} onChange={(v) => set("welcomeMessages", v)} />
         <Lines label="ขอบคุณ / อวยพร (หน้าสั่งเสร็จ)" value={s.thankYouMessages} onChange={(v) => set("thankYouMessages", v)} />
+      </Section>
+
+      <Section title="สถิติผู้เข้าชม (Google Analytics)">
+        <Text
+          label="Measurement ID"
+          value={s.gaMeasurementId}
+          onChange={(v) => set("gaMeasurementId", v.trim().toUpperCase())}
+          hint="สมัครฟรีที่ analytics.google.com → สร้าง Property แบบ Web → คัดลอก Measurement ID (ขึ้นต้นด้วย G-) มาใส่ · ว่าง = ไม่เก็บสถิติ · ไม่เก็บหน้าหลังบ้าน"
+        />
       </Section>
 
       <Section title="ร้าน">

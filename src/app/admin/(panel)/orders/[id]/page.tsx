@@ -237,7 +237,7 @@ export default async function OrderDetailPage({ params }: { params: Promise<{ id
               {order.customer_name} · {order.customer_phone}
             </p>
             <p>{address}</p>
-            {order.line_user_id && <p className="text-xs text-ok">✓ เชื่อม LINE แล้ว (แจ้งเลขแทร็คอัตโนมัติ)</p>}
+            {order.line_user_id && <p className="text-xs text-ok">✓ เชื่อม LINE แล้ว (แจ้งสถานะอัตโนมัติ)</p>}
             <CopyButton text={myOrderText} label="คัดลอกที่อยู่ (MyOrder)" className="w-full" />
             {order.customer_note && <p className="rounded-xl bg-warn-bg p-2">หมายเหตุลูกค้า: {order.customer_note}</p>}
             {isAdmin && (

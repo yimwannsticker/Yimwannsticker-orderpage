@@ -1,8 +1,8 @@
 import "server-only";
 import { db } from "../supabase/admin";
 import * as storage from "./storage";
-import type { Address, CheckResult, Finish, OrderStatus, ProductKey, Shape, Trim } from "../types";
-import { pushTracking, messagingEnabled } from "./line";
+import type { Address, CheckResult, Finish, LineEvent, OrderStatus, ProductKey, Shape, Trim } from "../types";
+import { getQuota, pushStatus, pushTracking, messagingEnabled } from "./line";
 import { siteUrl } from "./email";
 import { getSettings } from "./settings";
 
@@ -36,6 +36,7 @@ export interface OrderRow {
   carrier: string | null;
   tracking_no: string | null;
   line_notified_at: string | null;
+  line_events: Partial<Record<string, string>> | null;
   needs_attention: boolean;
   attention_note: string | null;
   files_deleted_at: string | null;
@@ -176,6 +177,73 @@ export async function markShipped(orderId: string, carrier: string, trackingNo: 
     }
   }
   return { order: o, line };
+}
+
+// ---------- แจ้งสถานะทาง LINE ----------
+
+/** ข้อความแต่ละสถานะ · repeat = ส่งซ้ำได้ทุกครั้ง (เรื่องที่ลูกค้าต้องทำอะไรต่อ) */
+const LINE_EVENTS: Record<LineEvent, { title: string; text: (detail: string) => string; button?: string; repeat?: boolean; essential?: boolean }> = {
+  paid: { title: "ได้รับชำระเงินแล้ว ✅", text: () => "ร้านตรวจสลิปเรียบร้อย ออเดอร์เข้าคิวผลิตแล้วค่ะ" },
+  producing: { title: "เริ่มผลิตแล้ว 🖨️", text: () => "กำลังพิมพ์และเตรียมแพ็กสติกเกอร์ของคุณค่ะ ส่งของแล้วจะแจ้งเลขพัสดุอีกครั้ง" },
+  slipRejected: {
+    title: "สลิปยังไม่ผ่าน กรุณาส่งใหม่",
+    text: (d) => `เหตุผล: ${d}\nกดปุ่มด้านล่างเพื่อแนบสลิปใหม่ค่ะ`,
+    button: "ส่งสลิปใหม่",
+    repeat: true,
+    essential: true,
+  },
+  reupload: {
+    title: "ร้านขอไฟล์ใหม่ 1 รายการ",
+    text: (d) => `เหตุผล: ${d}\nกดปุ่มด้านล่างเพื่ออัปโหลดไฟล์ใหม่ ร้านจะผลิตต่อทันทีที่ได้ไฟล์ค่ะ`,
+    button: "อัปโหลดไฟล์ใหม่",
+    repeat: true,
+    essential: true,
+  },
+  cancelled: { title: "ยกเลิกออเดอร์แล้ว", text: () => "ออเดอร์นี้ถูกยกเลิก หากมีข้อสงสัยทักแชตร้านได้เลยค่ะ" },
+};
+
+/**
+ * แจ้งลูกค้าทาง LINE เมื่อสถานะเปลี่ยน (เฉพาะออเดอร์ที่ผูก LINE และเปิดแจ้งเรื่องนั้นในตั้งค่า)
+ * ไม่ throw: ส่งไม่สำเร็จก็ไม่ทำให้การเปลี่ยนสถานะล้ม
+ */
+export async function notifyLine(orderId: string, event: LineEvent, detail = ""): Promise<"sent" | "skipped" | "failed"> {
+  try {
+    if (!messagingEnabled()) return "skipped";
+    const s = await getSettings();
+    if (!s.lineNotify[event]) return "skipped";
+    const { data } = await db().from("orders").select("id, order_no, token, line_user_id, line_events").eq("id", orderId).maybeSingle();
+    const o = data as Pick<OrderRow, "id" | "order_no" | "token" | "line_user_id" | "line_events"> | null;
+    if (!o?.line_user_id) return "skipped";
+    const def = LINE_EVENTS[event];
+    const sent = o.line_events ?? {};
+    if (!def.repeat && sent[event]) return "skipped";
+    // โควตาใกล้หมด: เก็บไว้แจ้งเรื่องสำคัญ
+    if (!def.essential && s.lineNotify.quotaGuard) {
+      const q = await getQuota();
+      if (q?.limit && q.used >= q.limit * 0.9) return "skipped";
+    }
+    if (!def.repeat) {
+      // จองสิทธิ์ก่อน กันกดซ้ำแล้วส่งสองครั้ง
+      const { data: claimed } = await db()
+        .from("orders")
+        .update({ line_events: { ...sent, [event]: new Date().toISOString() } })
+        .eq("id", o.id)
+        .eq("line_events", JSON.stringify(sent))
+        .select("id");
+      if (!claimed?.length) return "skipped";
+    }
+    try {
+      await pushStatus(o.line_user_id, { title: def.title, text: def.text(detail), orderNo: o.order_no, statusUrl: statusUrl(o.token), button: def.button });
+      return "sent";
+    } catch (e) {
+      console.error(e);
+      if (!def.repeat) await db().from("orders").update({ line_events: sent }).eq("id", o.id);
+      return "failed";
+    }
+  } catch (e) {
+    console.error(e);
+    return "failed";
+  }
 }
 
 export async function getOrCreateCustomer(phone: string, name: string, lineUserId: string | null) {
