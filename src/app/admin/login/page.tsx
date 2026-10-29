@@ -1,5 +1,6 @@
 "use client";
 
+import { Logo } from "@/components/Logo";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Alert, Spinner } from "@/components/ui";
@@ -36,7 +37,10 @@ export default function LoginPage() {
 
   return (
     <main className="mx-auto flex min-h-screen max-w-sm flex-col justify-center px-4">
-      <h1 className="text-center text-2xl font-bold text-brand-600">Yimwann หลังบ้าน</h1>
+      <h1 className="flex flex-col items-center gap-2 text-center text-xl font-bold text-brand-600">
+        <Logo variant="stacked" className="h-28" />
+        หลังบ้าน
+      </h1>
       <form onSubmit={login} className="card mt-6 space-y-4">
         <div>
           <label className="label" htmlFor="email">

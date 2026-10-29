@@ -62,7 +62,7 @@ export async function pushTracking(
         layout: "vertical",
         spacing: "md",
         contents: [
-          { type: "text", text: "จัดส่งแล้ว 🎉", weight: "bold", size: "xl", color: "#E0457B" },
+          { type: "text", text: "จัดส่งแล้ว 🎉", weight: "bold", size: "xl", color: "#006A52" },
           { type: "text", text: text, wrap: true, size: "sm", color: "#555555" },
           { type: "separator" },
           row("เลขออเดอร์", o.orderNo),
@@ -75,7 +75,7 @@ export async function pushTracking(
         layout: "vertical",
         spacing: "sm",
         contents: [
-          { type: "button", style: "primary", color: "#E0457B", action: { type: "uri", label: "ติดตามพัสดุ", uri: trackUrl } },
+          { type: "button", style: "primary", color: "#006A52", action: { type: "uri", label: "ติดตามพัสดุ", uri: trackUrl } },
           { type: "button", style: "link", action: { type: "uri", label: "ดูรายละเอียดออเดอร์", uri: o.statusUrl } },
         ],
       },
@@ -96,7 +96,7 @@ export async function pushStatus(to: string, m: { title: string; text: string; o
         layout: "vertical",
         spacing: "md",
         contents: [
-          { type: "text", text: m.title, weight: "bold", size: "lg", color: "#E0457B", wrap: true },
+          { type: "text", text: m.title, weight: "bold", size: "lg", color: "#006A52", wrap: true },
           { type: "text", text: m.text, wrap: true, size: "sm", color: "#555555" },
           { type: "separator" },
           row("เลขออเดอร์", m.orderNo),
@@ -105,7 +105,7 @@ export async function pushStatus(to: string, m: { title: string; text: string; o
       footer: {
         type: "box",
         layout: "vertical",
-        contents: [{ type: "button", style: "primary", color: "#E0457B", action: { type: "uri", label: m.button ?? "ดูรายละเอียดออเดอร์", uri: m.statusUrl } }],
+        contents: [{ type: "button", style: "primary", color: "#006A52", action: { type: "uri", label: m.button ?? "ดูรายละเอียดออเดอร์", uri: m.statusUrl } }],
       },
     },
   };

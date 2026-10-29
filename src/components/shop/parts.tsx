@@ -9,8 +9,8 @@ export function Badges({ p, className = "" }: { p: Pick<ShopProduct, "badgeBest"
   if (!p.badgeBest && !p.badgeNew) return null;
   return (
     <span className={`flex gap-1 ${className}`}>
-      {p.badgeBest && <span className="rounded-md bg-brand-500 px-1.5 py-0.5 text-[10px] font-bold leading-none text-white">ขายดี</span>}
-      {p.badgeNew && <span className="rounded-md bg-amber-400 px-1.5 py-0.5 text-[10px] font-bold leading-none text-white">ใหม่</span>}
+      {p.badgeBest && <span className="rounded-md bg-accent-400 px-1.5 py-0.5 text-[10px] font-bold leading-none text-brand-700">ขายดี</span>}
+      {p.badgeNew && <span className="rounded-md bg-brand-500 px-1.5 py-0.5 text-[10px] font-bold leading-none text-white">ใหม่</span>}
     </span>
   );
 }

@@ -56,7 +56,7 @@ export function BottomNav() {
                 {it.icon}
               </svg>
               {!!it.badge && (
-                <span className="absolute -right-2.5 -top-1.5 min-w-5 rounded-full bg-brand-500 px-1 text-center text-[11px] font-bold leading-5 text-white">
+                <span className="absolute -right-2.5 -top-1.5 min-w-5 rounded-full bg-accent-400 px-1 text-center text-[11px] font-bold leading-5 text-brand-700 ring-2 ring-white">
                   {it.badge > 99 ? "99+" : it.badge}
                 </span>
               )}

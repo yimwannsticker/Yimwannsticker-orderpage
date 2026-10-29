@@ -7,6 +7,7 @@ import { a5NudgeText, combineTotals, computeA5Quote } from "@/lib/a5-pricing";
 import { resolveCart } from "@/lib/cart-resolve";
 import { clearCart, getCart, useCart } from "@/lib/client/cart";
 import { track } from "@/lib/client/track";
+import { Logo } from "../Logo";
 import { quoteLineFor, type ShopCatalog } from "@/lib/shop-types";
 import { productLabel, shapeLabel } from "@/lib/constants";
 import { itemCheck, perSheet, sizeText } from "@/lib/sticker-size";
@@ -479,7 +480,9 @@ export function OrderWizard({ settings, catalog }: { settings: PublicSettings; c
     <div ref={topRef} className="mx-auto max-w-xl scroll-mt-4 px-4 pb-40 pt-4">
       <header className="mb-4 flex items-center justify-between gap-2">
         <Link href="/" className="min-w-0">
-          <p className="text-lg font-bold text-brand-600">‹ {settings.shopName}</p>
+          <span className="flex items-center gap-1 text-brand-600" aria-label={`กลับหน้าแรก ${settings.shopName}`}>
+            ‹ <Logo className="h-7" />
+          </span>
           <p className="text-sm text-muted">{a5Only ? "ชำระเงิน" : `สั่งพิมพ์สติกเกอร์ ${settings.sheetName}`}</p>
         </Link>
         <div className="flex shrink-0 gap-1">
@@ -867,7 +870,7 @@ function DoneScreen({
       <h1 className="mt-4 text-2xl font-bold">ส่งออเดอร์เรียบร้อย</h1>
       <p className="mt-1 text-muted">ร้านจะตรวจสลิปและเริ่มผลิตให้เร็วที่สุด</p>
       {blessing && (
-        <p className="mx-auto mt-4 max-w-md rounded-2xl bg-gradient-to-br from-brand-50 to-amber-50 px-4 py-3 text-lg font-semibold text-brand-700">
+        <p className="mx-auto mt-4 max-w-md rounded-2xl bg-gradient-to-br from-brand-50 to-accent-50 px-4 py-3 text-lg font-semibold text-brand-700">
           {blessing}
         </p>
       )}

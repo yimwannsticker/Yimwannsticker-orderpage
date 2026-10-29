@@ -18,14 +18,14 @@ export const metadata: Metadata = {
     siteName: "Yimwann Sticker",
     locale: "th_TH",
     type: "website",
-    images: ["/share-image"],
+    images: [{ url: "/brand/og.png", width: 1200, height: 630, alt: "Yimwann Sticker" }],
   },
 };
 
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
-  themeColor: "#e0457b",
+  themeColor: "#006a52",
 };
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {

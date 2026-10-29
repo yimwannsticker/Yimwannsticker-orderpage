@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Logo } from "@/components/Logo";
 import { requireStaff } from "@/lib/server/auth";
 import { db } from "@/lib/supabase/admin";
 import { logout } from "../actions";
@@ -28,11 +29,11 @@ export default async function PanelLayout({ children }: { children: React.ReactN
       <AutoRefresh seconds={60} />
       <header className="sticky top-0 z-20 border-b border-line bg-white/95 backdrop-blur">
         <div className="mx-auto flex max-w-6xl items-center gap-3 px-4 py-2">
-          <Link href="/admin" className="font-bold text-brand-600">
-            Yimwann หลังบ้าน
+          <Link href="/admin" className="flex items-center gap-2 font-bold text-brand-600">
+            <Logo variant="symbol" className="h-6" /> หลังบ้าน
           </Link>
           {!!count && (
-            <Link href="/admin?attention=1" className="rounded-full bg-brand-500 px-2.5 py-0.5 text-xs font-bold text-white">
+            <Link href="/admin?attention=1" className="rounded-full bg-accent-400 px-2.5 py-0.5 text-xs font-bold text-brand-700">
               ใหม่ {count}
             </Link>
           )}

@@ -2,15 +2,21 @@
 
 @theme {
   --font-sans: var(--font-thai), ui-sans-serif, system-ui, sans-serif;
-  --color-brand-50: #fff1f5;
-  --color-brand-100: #ffe1ea;
-  --color-brand-200: #ffc2d4;
-  --color-brand-500: #e0457b;
-  --color-brand-600: #c9336a;
-  --color-brand-700: #a82556;
-  --color-ink: #1f2430;
-  --color-muted: #6b7280;
-  --color-line: #e8e8ee;
+  /* CI Yimwann Sticker: เขียว #006A52 (สีหลัก) + เหลือง #F5B818 (สีเน้น) */
+  --color-brand-50: #eaf5f1;
+  --color-brand-100: #cfe8df;
+  --color-brand-200: #a3d3c2;
+  --color-brand-500: #006a52;
+  --color-brand-600: #005a46;
+  --color-brand-700: #004738;
+  --color-accent-50: #fff8e1;
+  --color-accent-100: #feedb5;
+  --color-accent-400: #f5b818;
+  --color-accent-500: #e3a40a;
+  --color-accent-700: #8a6300;
+  --color-ink: #1d2a25;
+  --color-muted: #66706c;
+  --color-line: #e4e9e5;
   --color-ok: #15803d;
   --color-ok-bg: #e9f8ee;
   --color-warn: #a16207;
@@ -24,7 +30,7 @@ html {
 }
 
 body {
-  background: #f7f7fa;
+  background: #f6f8f5;
   color: var(--color-ink);
 }
 
